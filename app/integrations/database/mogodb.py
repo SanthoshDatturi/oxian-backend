@@ -47,3 +47,11 @@ def get_chats_collection() -> AsyncIOMotorCollection:
 
 def get_messages_collection() -> AsyncIOMotorCollection:
     return _get_collection("messages")
+
+
+def get_farm_profiles_collection() -> AsyncIOMotorCollection:
+    return _get_collection("farm_profiles")
+
+
+def get_user_prefs_collection() -> AsyncIOMotorCollection:
+    return _get_collection("user_prefs")
