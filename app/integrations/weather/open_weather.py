@@ -1,10 +1,10 @@
 import json
 
-# It's highly recommended to use an environment variable for your API key.
 import os
 from typing import List, Optional
 
 import httpx
+from app.core.config import settings
 from app.schemas.weather import (
     AirPollutionResponse,
     CurrentWeatherResponse,
@@ -14,11 +14,16 @@ from app.schemas.weather import (
     WeatherMapResponse,
 )
 
-API_KEY = os.getenv("OPENWEATHERMAP_API_KEY", "your_default_api_key")
-
 BASE_URL = "https://api.openweathermap.org/data/2.5"
 GEO_BASE_URL = "http://api.openweathermap.org/geo/1.0"
 MAP_BASE_URL = "https://tile.openweathermap.org/map"
+
+
+def _require_api_key() -> str:
+    api_key = settings.OPENWEATHERMAP_API_KEY
+    if not api_key:
+        raise ValueError("OPENWEATHERMAP_API_KEY is not configured.")
+    return api_key
 
 
 async def get_current_weather(
@@ -45,7 +50,7 @@ async def get_current_weather(
         with open(cache_file, "r") as f:
             return CurrentWeatherResponse(**json.load(f))
 
-    params = {"lat": lat, "lon": lon, "appid": API_KEY, "units": "metric"}
+    params = {"lat": lat, "lon": lon, "appid": _require_api_key(), "units": "metric"}
     async with httpx.AsyncClient() as client:
         response = await client.get(f"{BASE_URL}/weather", params=params)
         if response.status_code == 200:
@@ -80,7 +85,7 @@ async def get_5_day_3_hour_forecast(
         with open(cache_file, "r") as f:
             return ForecastResponse(**json.load(f))
 
-    params = {"lat": lat, "lon": lon, "appid": API_KEY, "units": "metric"}
+    params = {"lat": lat, "lon": lon, "appid": _require_api_key(), "units": "metric"}
     async with httpx.AsyncClient() as client:
         response = await client.get(f"{BASE_URL}/forecast", params=params)
         if response.status_code == 200:
@@ -102,7 +107,7 @@ async def get_air_pollution(lat: float, lon: float) -> Optional[AirPollutionResp
     Returns:
         An AirPollutionResponse object or None if the request fails.
     """
-    params = {"lat": lat, "lon": lon, "appid": API_KEY}
+    params = {"lat": lat, "lon": lon, "appid": _require_api_key()}
     async with httpx.AsyncClient() as client:
         response = await client.get(f"{BASE_URL}/air_pollution", params=params)
         if response.status_code == 200:
@@ -123,7 +128,7 @@ async def get_reverse_geocoding(
     Returns:
         A list of GeocodingResponse objects or None if the request fails.
     """
-    params = {"lat": lat, "lon": lon, "limit": 5, "appid": API_KEY}
+    params = {"lat": lat, "lon": lon, "limit": 5, "appid": _require_api_key()}
     async with httpx.AsyncClient() as client:
         response = await client.get(f"{GEO_BASE_URL}/reverse", params=params)
         if response.status_code == 200:
@@ -150,8 +155,9 @@ def get_weather_map_urls() -> WeatherMapResponse:
     }
 
     map_layers = {}
+    api_key = _require_api_key()
     for name, layer_code in layers.items():
-        url = f"{MAP_BASE_URL}/{layer_code}/{{z}}/{{x}}/{{y}}.png?appid={API_KEY}"
+        url = f"{MAP_BASE_URL}/{layer_code}/{{z}}/{{x}}/{{y}}.png?appid={api_key}"
         map_layers[name] = WeatherMapLayer(layer=layer_code, url=url)
 
     return WeatherMapResponse(**map_layers)

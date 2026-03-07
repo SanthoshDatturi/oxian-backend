@@ -1,17 +1,17 @@
 from enum import StrEnum
-from typing import Optional
+from typing import Any
 
 from pydantic import BaseModel, Field
 
 
 class LatLang(BaseModel):
-    latitude: Optional[float] = Field(
+    latitude: float | None = Field(
         default=None,
-        description="""The latitude in degrees. It must be in the range [-90.0, +90.0].""",
+        description="The latitude in degrees. It must be in the range [-90.0, +90.0].",
     )
-    longitude: Optional[float] = Field(
+    longitude: float | None = Field(
         default=None,
-        description="""The longitude in degrees. It must be in the range [-180.0, +180.0]""",
+        description="The longitude in degrees. It must be in the range [-180.0, +180.0].",
     )
 
 
@@ -28,11 +28,15 @@ class Service(StrEnum):
 
 
 class WebSocketInboundMessage(BaseModel):
-    service: Service = Field(description="which service is requested by the user")
+    service: Service = Field(description="Which service is requested by the user.")
     event: Event
-    data: dict
+    data: dict[str, Any]
 
 
-class WebScoketOutboundMessage(BaseModel):
-    service: Service = Field(description="The service giving this response")
-    data: dict
+class WebSocketOutboundMessage(BaseModel):
+    service: Service = Field(description="The service that produced this response.")
+    data: dict[str, Any]
+
+
+# Backward-compatible alias for the misspelled schema name already used in the repo.
+WebScoketOutboundMessage = WebSocketOutboundMessage

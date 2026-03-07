@@ -22,6 +22,9 @@ class Settings(BaseSettings):
     AZURE_STORAGE_CONNECTION_STRING: Optional[str] = os.getenv(
         "AZURE_STORAGE_CONNECTION_STRING"
     )
+    OPENWEATHERMAP_API_KEY: Optional[str] = os.getenv("OPENWEATHERMAP_API_KEY")
+    GEMINI_CHAT_MODEL: str = os.getenv("GEMINI_CHAT_MODEL", "gemini-2.5-flash")
+    CHAT_HISTORY_LIMIT: int = int(os.getenv("CHAT_HISTORY_LIMIT", "16"))
 
 
 settings = Settings()

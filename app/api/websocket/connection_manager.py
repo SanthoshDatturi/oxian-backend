@@ -3,7 +3,7 @@ from typing import Dict, List
 
 from fastapi import WebSocket, WebSocketDisconnect
 
-from app.schemas.generic_types import WebScoketOutboundMessage
+from app.schemas.generic_types import WebSocketOutboundMessage
 
 
 class ConnectionManager:
@@ -18,11 +18,11 @@ class ConnectionManager:
         if websocket in self.user_rooms[user_id]:
             self.user_rooms[user_id].remove(websocket)
 
-    async def send_to_user(self, user_id: str, message: WebScoketOutboundMessage):
+    async def send_to_user(self, user_id: str, message: WebSocketOutboundMessage):
         sockets = self.user_rooms.get(user_id, [])
         for ws in sockets:
             try:
-                await ws.send_json(message.model_dump())
+                await ws.send_json(message.model_dump(mode="json", exclude_none=True))
             except WebSocketDisconnect:
                 self.disconnect(user_id, ws)
 

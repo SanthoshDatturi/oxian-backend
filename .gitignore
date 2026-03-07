@@ -17,7 +17,6 @@ wheels/
 .ruff_cache/
 
 # Temporary folders
-tests/
 .pytest_cache/
 .mypy_cache/
 .cache/

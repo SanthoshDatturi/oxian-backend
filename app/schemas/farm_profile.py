@@ -281,22 +281,12 @@ class FarmProfile(BaseModel):
         description="Dominant soil type present in the farm. Example: Black soil"
     )
 
-    crops: Optional[List[PreviousCrops]] = Field(
-        default=None,
-        description="Historical list of crops previously cultivated on the farm.",
-    )
-
     total_area: Area = Field(
         description="Total land area of the farm. Example: 5 acres."
     )
 
     cultivated_area: Area = Field(
         description="Area of the farm currently used for cultivation. Example: 4 acres."
-    )
-
-    soil_test_properties: Optional[SoilTestProperties] = Field(
-        default=None,
-        description="Detailed soil test results including nutrient levels and soil characteristics.",
     )
 
     water_source: WaterSource = Field(
@@ -306,4 +296,17 @@ class FarmProfile(BaseModel):
     irrigation_system: Optional[IrrigationSystem] = Field(
         default=None,
         description="Irrigation system used for watering crops if available. Example: Drip",
+    )
+
+    crops: Optional[List[PreviousCrops]] = Field(
+        default=None,
+        description="Historical list of crops previously cultivated on the farm.",
+    )
+
+    soil_test_properties: Optional[SoilTestProperties] = Field(
+        default=None,
+        description=(
+            "Detailed soil test results including nutrient levels and soil characteristics."
+            "Should upload images or PDF documents of the test, extract from them."
+        ),
     )

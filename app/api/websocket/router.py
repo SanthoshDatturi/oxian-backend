@@ -11,17 +11,16 @@ services = {
 
 
 async def route_message(user_id: str, message: WebSocketInboundMessage):
-
     service_name = message.service
     event = message.event
     data = message.data
 
     if service_name not in services:
-        raise Exception("Unknown service")
+        raise ValueError("Unknown service")
 
     handler = services[service_name]
 
     if event not in handler:
-        raise Exception("Unknown event")
+        raise ValueError("Unknown event")
 
     await handler[event](user_id, data)

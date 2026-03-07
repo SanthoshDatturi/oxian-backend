@@ -1,41 +1,37 @@
+import time
 from enum import StrEnum
-from typing import Optional, TypeAlias
+from typing import Any
 from uuid import uuid4
 
 from pydantic import AliasChoices, BaseModel, Field
-
-JsonString: TypeAlias = str
 
 
 class State(StrEnum):
     PENDING = "pending"
     RUNNING = "running"
+    STOPPED = "stopped"
     COMPLETED = "completed"
     FAILED = "failed"
 
 
-class Process(BaseModel):
-    """
-    Used for hadling different events of a process.
-    Process is used for storing the intermediate data of multi stage long running process.
-    The process will be deleted if the process is completed or on cancel event etc,.
-    """
+class ProcessError(BaseModel):
+    code: str
+    message: str
+    details: dict[str, Any] | None = None
 
+
+class Process(BaseModel):
     id: str = Field(
         default_factory=lambda: uuid4().hex,
         validation_alias=AliasChoices("id", "_id"),
         serialization_alias="_id",
     )
-    # The step that is currently being executed. It can be None if the process is only single step.
-    # If there are multiple steps, it will be the name of the step that is currently being executed.
-    step: Optional[StrEnum] = Field(
+    status: State
+    payload: dict[str, Any] | None = Field(
         default=None,
-        description="Should be defined as a StrEnum by respective services",
+        description="Service-specific resumable execution payload.",
     )
-    status: State = Field(
-        description="If the process is only single step, it will be the status of the process. If there are multiple steps, it will be the status of the current step."
-    )
-    pay_load: Optional[JsonString] = Field(
-        default=None,
-        description="A process does'nt care about the data, it just used for tracking the actual process happening",
-    )
+    error: ProcessError | None = None
+    created_at: float = Field(default_factory=time.time)
+    updated_at: float = Field(default_factory=time.time)
+    completed_at: float | None = None

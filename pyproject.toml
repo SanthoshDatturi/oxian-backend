@@ -15,3 +15,8 @@ dependencies = [
     "motor>=3.7.1",
     "python-frontmatter>=1.1.0",
 ]
+
+[dependency-groups]
+dev = [
+    "ty>=0.0.21",
+]

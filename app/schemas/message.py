@@ -1,45 +1,116 @@
 import time
 from enum import StrEnum
-from typing import List
+from typing import Annotated, Any, Literal
 from uuid import uuid4
 
 from pydantic import AliasChoices, BaseModel, Field
 
+from app.schemas.generic_types import LatLang
+
 
 class Role(StrEnum):
-    # Define roles based on the LangChain standard roles
     HUMAN = "human"
     AI = "ai"
-    pass
 
 
-class Content(BaseModel):
-    # Define the structure of the content based on the LangChain standard
-    # How text, images, or other media types are structured in the message content
-    # When sending history image and other files sent by user should only be send for first time only
-    # If media or files in prev message history, they should be handled with RAG or for audio alt text should be generated (may be returned by AI when respoding).
-    # can also contain data like LatLand from generic_types.py
-    pass
+class PartType(StrEnum):
+    TEXT = "text"
+    FILE = "file"
+    LOCATION = "location"
+    FARM_PROFILE_REFERENCE = "farm_profile_reference"
+
+
+class FileMediaKind(StrEnum):
+    IMAGE = "image"
+    AUDIO = "audio"
+    DOCUMENT = "document"
+
+
+class TextPart(BaseModel):
+    type: Literal[PartType.TEXT] = PartType.TEXT
+    text: str
+
+
+class FilePart(BaseModel):
+    type: Literal[PartType.FILE] = PartType.FILE
+    blob_reference: str
+    filename: str
+    mime_type: str
+    media_kind: FileMediaKind
+    caption: str | None = None
+    extracted_text: str | None = Field(
+        default=None,
+        description="Text summary/transcript persisted for future history reuse.",
+    )
+
+
+class LocationPart(BaseModel):
+    type: Literal[PartType.LOCATION] = PartType.LOCATION
+    location: LatLang
+    label: str | None = None
+
+
+class FarmProfileReferencePart(BaseModel):
+    type: Literal[PartType.FARM_PROFILE_REFERENCE] = PartType.FARM_PROFILE_REFERENCE
+    farm_id: str
+    name: str
+
+
+MessagePart = Annotated[
+    TextPart | FilePart | LocationPart | FarmProfileReferencePart,
+    Field(discriminator="type"),
+]
+UserMessagePart = Annotated[
+    TextPart | FilePart | LocationPart,
+    Field(discriminator="type"),
+]
+
+
+class MessageUsage(BaseModel):
+    input_tokens: int | None = None
+    output_tokens: int | None = None
+    total_tokens: int | None = None
+    input_token_details: dict[str, Any] | None = None
+    output_token_details: dict[str, Any] | None = None
+
+
+class MessageError(BaseModel):
+    code: str
+    message: str
+    details: dict[str, Any] | None = None
 
 
 class MessageStatus(StrEnum):
-    COMPLETE = "complete"
-    DATA = "data"
+    PENDING = "pending"
     STREAMING = "streaming"
+    COMPLETE = "complete"
+    STOPPED = "stopped"
     ERROR = "error"
 
 
 class Message(BaseModel):
-    # Define the structure of a message in the chat, including the role of the sender and the content of the message
     id: str = Field(
         default_factory=lambda: uuid4().hex,
         validation_alias=AliasChoices("id", "_id"),
         serialization_alias="_id",
     )
     chat_id: str
-    process_id = Field(
-        description="The process created when this message sent by human, human message and AI message should contain same process"
-    )
+    user_id: str
+    process_id: str
     role: Role
-    contents: List[Content]
-    created_at: float = time.time()
+    status: MessageStatus = MessageStatus.PENDING
+    parts: list[MessagePart] = Field(default_factory=list)
+    usage: MessageUsage | None = None
+    error: MessageError | None = None
+    metadata: dict[str, Any] = Field(default_factory=dict)
+    created_at: float = Field(default_factory=time.time)
+    updated_at: float = Field(default_factory=time.time)
+
+    def text_content(self) -> str:
+        text_chunks: list[str] = []
+        for part in self.parts:
+            if isinstance(part, TextPart):
+                text_chunks.append(part.text)
+            elif isinstance(part, FilePart) and part.extracted_text:
+                text_chunks.append(part.extracted_text)
+        return " ".join(chunk.strip() for chunk in text_chunks if chunk).strip()
