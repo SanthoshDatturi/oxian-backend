@@ -3,5 +3,5 @@
 from pydantic import BaseModel
 
 
-async def chat(data: BaseModel, send_chunk, send_data):
+async def chat(data: BaseModel, send_data):
     pass

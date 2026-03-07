@@ -5,10 +5,11 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect, status
 
 from app.api.rest.files import router as files_router
 from app.api.websocket.connection_manager import manager
-from app.api.websocket.router import WebSocketMessage, route_message
+from app.api.websocket.router import route_message
 from app.core.dev.dependencies import authenticate_websocket
 from app.core.simple_queue import worker
 from app.integrations.auth.errors import AuthError
+from app.schemas.generic_types import WebSocketInboundMessage
 
 
 @asynccontextmanager
@@ -42,7 +43,9 @@ async def websocket_endpoint(websocket: WebSocket):
     try:
         while True:
             message = await websocket.receive_json()
-            await route_message(user_id, WebSocketMessage.model_validate_json(message))
+            await route_message(
+                user_id, WebSocketInboundMessage.model_validate_json(message)
+            )
 
     except WebSocketDisconnect:
         manager.disconnect(user_id, websocket)

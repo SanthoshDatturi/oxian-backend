@@ -1,5 +1,6 @@
 import time
 from enum import StrEnum
+from typing import List
 from uuid import uuid4
 
 from pydantic import AliasChoices, BaseModel, Field
@@ -21,6 +22,13 @@ class Content(BaseModel):
     pass
 
 
+class MessageStatus(StrEnum):
+    COMPLETE = "complete"
+    DATA = "data"
+    STREAMING = "streaming"
+    ERROR = "error"
+
+
 class Message(BaseModel):
     # Define the structure of a message in the chat, including the role of the sender and the content of the message
     id: str = Field(
@@ -29,6 +37,9 @@ class Message(BaseModel):
         serialization_alias="_id",
     )
     chat_id: str
+    process_id = Field(
+        description="The process created when this message sent by human, human message and AI message should contain same process"
+    )
     role: Role
-    content: Content
+    contents: List[Content]
     created_at: float = time.time()

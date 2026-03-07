@@ -20,4 +20,7 @@ class Chat(BaseModel):
     )
     title: str
     mode: ChatMode
+    process_id: str = Field(
+        description="Process id of the last processed message or message currently processing, i.e model is streaming response"
+    )
     created_at: float = time.time()

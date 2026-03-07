@@ -2,7 +2,8 @@ from collections import defaultdict
 from typing import Dict, List
 
 from fastapi import WebSocket, WebSocketDisconnect
-from pydantic import BaseModel
+
+from app.schemas.generic_types import WebScoketOutboundMessage
 
 
 class ConnectionManager:
@@ -17,7 +18,7 @@ class ConnectionManager:
         if websocket in self.user_rooms[user_id]:
             self.user_rooms[user_id].remove(websocket)
 
-    async def send_to_user(self, user_id: str, message: BaseModel):
+    async def send_to_user(self, user_id: str, message: WebScoketOutboundMessage):
         sockets = self.user_rooms.get(user_id, [])
         for ws in sockets:
             try:

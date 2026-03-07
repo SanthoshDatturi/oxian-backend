@@ -1,22 +1,16 @@
-from enum import StrEnum
+from app.schemas.generic_types import Service, WebSocketInboundMessage
+from app.services.chat.handler import chat_handlers
+from app.services.crop_recommendation.handler import (
+    crop_recommendation_handlers,
+)
 
-from pydantic import BaseModel
-
-
-class Service(StrEnum):
-    CHAT = "chat"
-
-
-class WebSocketMessage(BaseModel):
-    service: Service
-    event: StrEnum
-    data: dict
+services = {
+    Service.CHAT: chat_handlers,
+    Service.CROP_RECOMMENDATION: crop_recommendation_handlers,
+}
 
 
-services = {}
-
-
-async def route_message(user_id: str, message: WebSocketMessage):
+async def route_message(user_id: str, message: WebSocketInboundMessage):
 
     service_name = message.service
     event = message.event
@@ -25,9 +19,9 @@ async def route_message(user_id: str, message: WebSocketMessage):
     if service_name not in services:
         raise Exception("Unknown service")
 
-    service = services[service_name]
+    handler = services[service_name]
 
-    if event not in service:
+    if event not in handler:
         raise Exception("Unknown event")
 
-    await service[event](user_id, data)
+    await handler[event](user_id, data)
