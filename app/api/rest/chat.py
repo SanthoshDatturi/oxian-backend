@@ -35,11 +35,10 @@ async def get_chat(
 @router.delete("/{chat_id}", status_code=204)
 async def delete_chat(chat_id: str, user_payload: dict = Depends(authenticate_rest)):
     user_id = _get_user_id(user_payload)
-    chat = await chat_repository.get_by_id(chat_id, user_id=user_id)
-    if chat is None:
+    deleted = await chat_repository.delete(chat_id, user_id=user_id)
+    if not deleted:
         raise HTTPException(status_code=404, detail="Chat not found")
     await message_repository.delete_by_chat(chat_id)
-    await chat_repository.delete(chat_id, user_id=user_id)
     return
 
 

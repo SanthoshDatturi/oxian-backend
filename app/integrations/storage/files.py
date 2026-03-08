@@ -214,7 +214,7 @@ async def delete(scope: StorageScope, blob_name: str):
         raise error_type("Failed to delete file.") from exc
 
 
-async def delete_many(scope: StorageScope, prefix: str):
+async def delete_many(prefix: str, scope: StorageScope = StorageScope.USER):
     """
     Delete all files in the storage system that match a given prefix.
 

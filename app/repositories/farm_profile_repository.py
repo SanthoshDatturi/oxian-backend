@@ -38,8 +38,9 @@ async def list_by_user(user_id: str, limit: int = 100) -> list[FarmProfile]:
     return [FarmProfile.model_validate(document) async for document in cursor]
 
 
-async def delete(farm_id: str, user_id: str | None = None) -> None:
+async def delete(farm_id: str, user_id: str | None = None) -> bool:
     query: dict[str, str] = {"_id": farm_id}
     if user_id:
         query["user_id"] = user_id
-    await get_farm_profiles_collection().delete_one(query)
+    result = await get_farm_profiles_collection().delete_one(query)
+    return result.deleted_count > 0

@@ -91,8 +91,7 @@ async def delete_farm_profile(
     user_payload: dict = Depends(authenticate_rest),
 ):
     user_id = _get_user_id(user_payload)
-    existing = await farm_profile_repository.get_by_id(farm_id, user_id=user_id)
-    if existing is None:
+    deleted = await farm_profile_repository.delete(farm_id, user_id=user_id)
+    if not deleted:
         raise HTTPException(status_code=404, detail="Farm profile not found")
-    await farm_profile_repository.delete(farm_id, user_id=user_id)
     return

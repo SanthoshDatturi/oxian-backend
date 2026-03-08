@@ -1,7 +1,40 @@
+import asyncio
+import logging
 import time
 
+from app.core.simple_queue import enqueue
 from app.integrations.database.mogodb import get_chats_collection
+from app.integrations.storage import files
+from app.integrations.storage.base import StorageEntity
+from app.repositories import message_repository
 from app.schemas.chat import Chat
+
+logger = logging.getLogger(__name__)
+
+
+async def _cleanup_chat_files(user_id: str, chat_id: str) -> None:
+    prefix = f"{user_id}/{StorageEntity.CHAT.value}/{chat_id}"
+    delays = (1, 5, 15)
+
+    for attempt in range(1, 4):
+        try:
+            await files.delete_many(prefix=prefix)
+            return
+        except Exception:
+            logger.exception(
+                "Chat file cleanup failed (attempt %s/3) for chat_id=%s user_id=%s",
+                attempt,
+                chat_id,
+                user_id,
+            )
+            if attempt < 3:
+                await asyncio.sleep(delays[attempt - 1])
+
+    logger.error(
+        "Chat file cleanup permanently failed after retries for chat_id=%s user_id=%s",
+        chat_id,
+        user_id,
+    )
 
 
 def _touch(chat: Chat) -> Chat:
@@ -48,8 +81,22 @@ async def list_by_user(user_id: str, limit: int = 50) -> list[Chat]:
     return [Chat.model_validate(document) async for document in cursor]
 
 
-async def delete(chat_id: str, user_id: str | None = None) -> None:
-    query: dict[str, str] = {"_id": chat_id}
-    if user_id:
-        query["user_id"] = user_id
-    await get_chats_collection().delete_one(query)
+async def delete(chat_id: str, user_id: str) -> bool:
+    query: dict[str, str] = {"_id": chat_id, "user_id": user_id}
+    result = await get_chats_collection().delete_one(query)
+    if result.deleted_count > 0:
+        await message_repository.delete_by_chat(chat_id)
+        try:
+            await files.delete_many(
+                prefix=f"{user_id}/{StorageEntity.CHAT.value}/{chat_id}"
+            )
+        except Exception:
+            logger.exception(
+                "Failed to delete chat files for chat_id=%s user_id=%s, queuing cleanup",
+                chat_id,
+                user_id,
+            )
+            await enqueue(lambda: _cleanup_chat_files(user_id, chat_id))
+        return True
+
+    return False
