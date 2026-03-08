@@ -4,6 +4,8 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, status
 
 from app.api.rest.files import router as files_router
+from app.api.rest.chat import router as chat_router
+from app.api.rest.farm_profile import router as farm_profile_router
 from app.api.websocket.connection_manager import manager
 from app.api.websocket.router import route_message
 from app.core.dependencies import authenticate_websocket
@@ -29,6 +31,8 @@ async def lifespan(app: FastAPI):
 app = FastAPI(lifespan=lifespan)
 
 app.include_router(files_router)
+app.include_router(chat_router)
+app.include_router(farm_profile_router)
 
 
 @app.websocket("/ws")
