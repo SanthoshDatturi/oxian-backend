@@ -60,10 +60,6 @@ MessagePart = Annotated[
     TextPart | FilePart | LocationPart | FarmProfileReferencePart,
     Field(discriminator="type"),
 ]
-UserMessagePart = Annotated[
-    TextPart | FilePart | LocationPart,
-    Field(discriminator="type"),
-]
 
 
 class MessageUsage(BaseModel):
@@ -96,7 +92,6 @@ class Message(BaseModel):
     )
     chat_id: str
     user_id: str
-    process_id: str
     role: Role
     status: MessageStatus = MessageStatus.PENDING
     parts: list[MessagePart] = Field(default_factory=list)
@@ -105,12 +100,3 @@ class Message(BaseModel):
     metadata: dict[str, Any] = Field(default_factory=dict)
     created_at: float = Field(default_factory=time.time)
     updated_at: float = Field(default_factory=time.time)
-
-    def text_content(self) -> str:
-        text_chunks: list[str] = []
-        for part in self.parts:
-            if isinstance(part, TextPart):
-                text_chunks.append(part.text)
-            elif isinstance(part, FilePart) and part.extracted_text:
-                text_chunks.append(part.extracted_text)
-        return " ".join(chunk.strip() for chunk in text_chunks if chunk).strip()

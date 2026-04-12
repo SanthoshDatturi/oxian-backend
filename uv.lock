@@ -193,7 +193,6 @@ dependencies = [
     { name = "firebase-admin" },
     { name = "langchain" },
     { name = "langchain-google-genai" },
-    { name = "langgraph" },
     { name = "motor" },
     { name = "python-frontmatter" },
 ]
@@ -211,7 +210,6 @@ requires-dist = [
     { name = "firebase-admin", specifier = ">=7.2.0" },
     { name = "langchain", specifier = ">=1.2.10" },
     { name = "langchain-google-genai", specifier = ">=4.2.1" },
-    { name = "langgraph", specifier = ">=1.0.10" },
     { name = "motor", specifier = ">=3.7.1" },
     { name = "python-frontmatter", specifier = ">=1.1.0" },
 ]
