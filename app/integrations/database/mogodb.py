@@ -49,6 +49,10 @@ def get_messages_collection() -> AsyncIOMotorCollection:
     return _get_collection("messages")
 
 
+def get_files_collection() -> AsyncIOMotorCollection:
+    return _get_collection("files")
+
+
 def get_farm_profiles_collection() -> AsyncIOMotorCollection:
     return _get_collection("farm_profiles")
 

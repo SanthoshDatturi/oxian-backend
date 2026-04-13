@@ -1,6 +1,6 @@
 import inspect
+import logging
 from typing import IO, Union
-from urllib.parse import urlparse
 
 from azure.core.exceptions import (
     AzureError,
@@ -23,6 +23,8 @@ from .errors import (
     StorageUploadError,
 )
 
+logger = logging.getLogger(__name__)
+
 
 def _guess_mime_type(data: bytes) -> str:
     if data.startswith(b"\x89PNG\r\n\x1a\n"):
@@ -32,56 +34,6 @@ def _guess_mime_type(data: bytes) -> str:
     if data.startswith(b"RIFF") and data[8:12] == b"WAVE":
         return "audio/wav"
     return "application/octet-stream"
-
-
-def _normalize_prefix(prefix: str) -> str:
-    if not prefix:
-        return ""
-    return prefix.lstrip("/")
-
-
-def _build_blob_name(prefix: str, filename: str) -> str:
-    if not prefix:
-        return filename
-    if prefix.endswith("/"):
-        return f"{prefix}{filename}"
-    return f"{prefix}/{filename}"
-
-
-def parse_blob_reference(blob_reference: str) -> tuple[str, str]:
-    parsed = urlparse(blob_reference)
-    if parsed.scheme and parsed.netloc:
-        path = parsed.path.lstrip("/")
-        if "/" not in path:
-            raise ValueError("Invalid blob reference URL.")
-        container_name, blob_name = path.split("/", 1)
-        return container_name, blob_name
-
-    if "/" in blob_reference:
-        container_name, blob_name = blob_reference.split("/", 1)
-        if container_name and blob_name:
-            return container_name, blob_name
-
-    raise ValueError("Blob reference must be a URL or 'container/blob' identifier.")
-
-
-def _split_prefix(prefix: str) -> tuple[str | None, str]:
-    parsed = urlparse(prefix)
-    if parsed.scheme and parsed.netloc:
-        path = parsed.path.lstrip("/")
-        if not path:
-            return None, ""
-        if "/" in path:
-            container_name, blob_prefix = path.split("/", 1)
-            return container_name, blob_prefix
-        return path, ""
-
-    normalized = _normalize_prefix(prefix)
-    if "/" in normalized:
-        container_name, blob_prefix = normalized.split("/", 1)
-        if container_name in {scope.value for scope in StorageScope}:
-            return container_name, blob_prefix
-    return None, normalized
 
 
 async def _read_bytes(file_stream: Union[bytes, IO[bytes]]) -> bytes:
@@ -129,9 +81,8 @@ def _map_azure_error(error: AzureError, *, operation: str):
 
 async def upload(
     file_stream: Union[bytes, IO[bytes]],
-    filename: str,
+    file_id: str,
     scope: StorageScope,
-    prefix: str,
     mime_type: str | None = None,
 ):
     """
@@ -139,9 +90,8 @@ async def upload(
 
     Args:
         file_stream: The file content as bytes or a file-like object.
-        filename: The name of the file to be stored.
+        file_id: The file id used as the blob name.
         scope: The storage scope (user or system).
-        prefix: prefix for the storage path.
         mime_type: MIME type of the file.
 
     Returns:
@@ -151,8 +101,7 @@ async def upload(
         data = await _read_bytes(file_stream)
         content_type = mime_type or _guess_mime_type(data)
         container_client = await get_container_client(scope.value)
-        blob_name = _build_blob_name(prefix, filename)
-        blob_client = container_client.get_blob_client(blob_name)
+        blob_client = container_client.get_blob_client(file_id)
         await blob_client.upload_blob(
             data,
             overwrite=True,
@@ -168,22 +117,19 @@ async def upload(
         raise error_type("Failed to upload file.") from exc
 
 
-async def download(blob_reference: str) -> bytes | None:
+async def download(file_id: str, scope: StorageScope) -> bytes | None:
     """
     Download a file from the storage system.
 
     Args:
-        blob_reference: The URL or identifier of the file to be downloaded.
+        file_id: The file id used as the blob name.
+        scope: The storage scope (user or system).
     Returns:
         The content of the file as bytes.
     """
     try:
-        container_name, blob_name = parse_blob_reference(blob_reference)
-    except ValueError as exc:
-        raise StorageDownloadError("Invalid blob reference.") from exc
-    try:
-        container_client = await get_container_client(container_name)
-        blob_client = container_client.get_blob_client(blob_name)
+        container_client = await get_container_client(scope.value)
+        blob_client = container_client.get_blob_client(file_id)
         downloader = await blob_client.download_blob()
         data = await downloader.readall()
         if isinstance(data, str):
@@ -196,16 +142,16 @@ async def download(blob_reference: str) -> bytes | None:
         raise error_type("Failed to download file.") from exc
 
 
-async def delete(scope: StorageScope, blob_name: str):
+async def delete(scope: StorageScope, file_id: str):
     """
     Delete a file from the storage system.
 
     Args:
-        blob_reference: The URL or identifier of the file to be deleted.
+        file_id: The file id used as the blob name.
     """
     try:
         container_client = await get_container_client(scope.value)
-        blob_client = container_client.get_blob_client(blob_name)
+        blob_client = container_client.get_blob_client(file_id)
         await blob_client.delete_blob()
     except ValueError as exc:
         raise StorageBackendError("Storage configuration error.") from exc
@@ -214,21 +160,35 @@ async def delete(scope: StorageScope, blob_name: str):
         raise error_type("Failed to delete file.") from exc
 
 
-async def delete_many(prefix: str, scope: StorageScope = StorageScope.USER):
+async def delete_many(
+    file_ids: list[str],
+    scope: StorageScope = StorageScope.USER,
+) -> list[str]:
     """
-    Delete all files in the storage system that match a given prefix.
+    Delete all files in the storage system that match the given file ids.
 
     Args:
         scope: The storage scope (user or system).
-        prefix: The prefix to filter files by (e.g., "users/{user_id}/chats/").
+        file_ids: File ids used as blob names to delete.
     """
     try:
         container_client = await get_container_client(scope.value)
-        async for blob in container_client.list_blobs(name_starts_with=prefix or None):
-            blob_client = container_client.get_blob_client(blob.name)
-            await blob_client.delete_blob()
+        deleted_ids: list[str] = []
+        for file_id in file_ids:
+            try:
+                blob_client = container_client.get_blob_client(file_id)
+                await blob_client.delete_blob()
+                deleted_ids.append(file_id)
+            except AzureError as exc:
+                error_type = _map_azure_error(exc, operation="delete")
+                if error_type is StorageNotFoundError:
+                    deleted_ids.append(file_id)
+                    continue
+                logger.exception(
+                    "Failed to delete blob file_id=%s scope=%s",
+                    file_id,
+                    scope,
+                )
+        return deleted_ids
     except ValueError as exc:
         raise StorageBackendError("Storage configuration error.") from exc
-    except AzureError as exc:
-        error_type = _map_azure_error(exc, operation="delete")
-        raise error_type("Failed to delete files.") from exc

@@ -2,7 +2,6 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel
 
 from app.core.dependencies import authenticate_rest
-from app.integrations.storage.base import StorageEntity
 from app.integrations.storage.errors import (
     StorageAuthError,
     StorageBackendError,
@@ -16,7 +15,7 @@ router = APIRouter(prefix="/files", tags=["Files"])
 
 
 class FileUploadResponse(BaseModel):
-    blob_reference: str
+    file_id: str
 
 
 def _raise_for_storage_error(exc: Exception):
@@ -38,28 +37,28 @@ def _raise_for_storage_error(exc: Exception):
 @router.post("/", response_model=FileUploadResponse, status_code=201)
 async def upload_file(
     file: UploadFile = File(...),
-    filename: str = Form(...),
-    entity: StorageEntity = Form(...),
-    entity_id: str = Form(...),
+    filename: str | None = Form(default=None),
     mime_type: str | None = Form(default=None),
     user_payload: dict = Depends(authenticate_rest),
 ) -> FileUploadResponse:
     """
-    Uploads a file as multipart/form-data to Azure Blob Storage and returns the URL.
+    Uploads a file as multipart/form-data and stores temporary metadata.
     """
     user_id = user_payload.get("uid") or user_payload.get("sub")
     if not user_id:
         raise HTTPException(status_code=401, detail="Invalid authentication token")
 
+    resolved_filename = filename or file.filename
+    if not resolved_filename:
+        raise HTTPException(status_code=400, detail="Filename is required")
+
     resolved_mime_type = mime_type or file.content_type
 
     try:
-        blob_reference = await service.upload_file(
+        file_id = await service.upload_file(
             file_stream=file.file,
-            filename=filename,
+            filename=resolved_filename,
             user_id=user_id,
-            entity=entity,
-            entity_id=entity_id,
             mime_type=resolved_mime_type,
         )
     except (
@@ -70,23 +69,25 @@ async def upload_file(
     ) as exc:
         _raise_for_storage_error(exc)
 
-    return FileUploadResponse(blob_reference=blob_reference)
+    return FileUploadResponse(file_id=file_id)
 
 
 @router.delete("/", status_code=204)
 async def delete_file(
-    blob_reference: str,
+    file_id: str,
     user_payload: dict = Depends(authenticate_rest),
 ):
     """
-    Deletes a file from Azure Blob Storage given its URL.
+    Deletes a temporary file by its file id.
     """
-    if not (user_payload.get("uid") or user_payload.get("sub")):
+    user_id = user_payload.get("uid") or user_payload.get("sub")
+    if not user_id:
         raise HTTPException(status_code=401, detail="Invalid authentication token")
 
     try:
         await service.delete_file(
-            blob_reference=blob_reference,
+            file_id=file_id,
+            user_id=user_id,
         )
     except (
         StorageDeleteError,

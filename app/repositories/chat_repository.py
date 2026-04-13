@@ -1,24 +1,59 @@
 import asyncio
 import logging
 import time
+from collections import defaultdict
 
 from app.core.simple_queue import enqueue
 from app.integrations.database.mogodb import get_chats_collection
 from app.integrations.storage import files
-from app.integrations.storage.base import StorageEntity
-from app.repositories import message_repository
+from app.integrations.storage.base import StorageScope
+from app.repositories import files_repository, message_repository
 from app.schemas.chat import Chat
 
 logger = logging.getLogger(__name__)
 
 
+async def _delete_files_for_chat(user_id: str, chat_id: str) -> None:
+    stored_files = await files_repository.list_by_entity(
+        entity_id=chat_id,
+        user_id=user_id,
+    )
+    if not stored_files:
+        return
+
+    deleted_ids: list[str] = []
+    file_ids_by_scope: dict[StorageScope, list[str]] = defaultdict(list)
+
+    for stored_file in stored_files:
+        file_ids_by_scope[stored_file.storage_scope].append(stored_file.id)
+
+    for storage_scope, file_ids in file_ids_by_scope.items():
+        try:
+            deleted_ids.extend(
+                await files.delete_many(file_ids=file_ids, scope=storage_scope)
+            )
+        except Exception:
+            logger.exception(
+                "Failed to delete chat file blobs for chat_id=%s user_id=%s scope=%s file_ids=%s",
+                chat_id,
+                user_id,
+                storage_scope,
+                file_ids,
+            )
+
+    if deleted_ids:
+        await files_repository.delete_many_by_ids(deleted_ids)
+
+    if len(deleted_ids) != len(stored_files):
+        raise RuntimeError("Some chat file deletions failed.")
+
+
 async def _cleanup_chat_files(user_id: str, chat_id: str) -> None:
-    prefix = f"{user_id}/{StorageEntity.CHAT.value}/{chat_id}"
     delays = (1, 5, 15)
 
     for attempt in range(1, 4):
         try:
-            await files.delete_many(prefix=prefix)
+            await _delete_files_for_chat(user_id=user_id, chat_id=chat_id)
             return
         except Exception:
             logger.exception(
@@ -87,9 +122,7 @@ async def delete(chat_id: str, user_id: str) -> bool:
     if result.deleted_count > 0:
         await message_repository.delete_by_chat(chat_id)
         try:
-            await files.delete_many(
-                prefix=f"{user_id}/{StorageEntity.CHAT.value}/{chat_id}"
-            )
+            await _delete_files_for_chat(user_id=user_id, chat_id=chat_id)
         except Exception:
             logger.exception(
                 "Failed to delete chat files for chat_id=%s user_id=%s, queuing cleanup",

@@ -1,58 +1,118 @@
+import logging
+import time
+from collections import defaultdict
 from typing import IO, Union
 
 from app.integrations.storage import files
 from app.integrations.storage.base import StorageEntity, StorageScope
-from app.integrations.storage.errors import StorageDeleteError, StorageUploadError
+from app.integrations.storage.errors import (
+    StorageBackendError,
+    StorageDeleteError,
+    StorageNotFoundError,
+    StorageUploadError,
+)
+from app.repositories import files_repository
+from app.schemas.file import File, FileStatus
+
+logger = logging.getLogger(__name__)
+
+TEMP_FILE_RETENTION_SECONDS = 5 * 60 * 60
 
 
-async def validate_entity(entity: StorageEntity, entity_id: str):
-    if not entity_id:
-        raise ValueError("Entity id is required")
-
-    # TODO: Validate entity once repositories are available.
-    # Keeping this hook in place prevents silent acceptance of empty identifiers.
-
-
-def _sanitize_prefix(prefix: str) -> str:
-    cleaned = "/".join(segment for segment in prefix.split("/") if segment)
-    return f"{cleaned}/" if cleaned else ""
-
-
-def build_prefix(
-    user_id: str,
-    entity: StorageEntity,
-    entity_id: str,
-) -> str:
-    raw_prefix = f"{user_id}/{entity.value}/{entity_id}"
-    return _sanitize_prefix(raw_prefix)
+async def _delete_blob_if_exists(file: File) -> bool:
+    try:
+        await files.delete(scope=file.storage_scope, file_id=file.id)
+        return True
+    except StorageNotFoundError:
+        return True
 
 
 async def upload_file(
     file_stream: Union[bytes, IO[bytes]],
     filename: str,
     user_id: str,
-    entity: StorageEntity,
-    entity_id: str,
     mime_type: str | None = None,
-):
-    # Validate enity to be used after implementing repositories
-    try:
-        await validate_entity(entity=entity, entity_id=entity_id)
-    except ValueError as exc:
-        raise StorageUploadError("Invalid upload request.") from exc
-
-    return await files.upload(
-        file_stream=file_stream,
+) -> str:
+    stored_file = File(
+        user_id=user_id,
         filename=filename,
-        scope=StorageScope.USER,
-        prefix=build_prefix(user_id=user_id, entity=entity, entity_id=entity_id),
-        mime_type=mime_type,
+        content_type=mime_type or "application/octet-stream",
+        status=FileStatus.TEMP,
     )
 
+    await files.upload(
+        file_stream=file_stream,
+        file_id=stored_file.id,
+        scope=stored_file.storage_scope,
+        mime_type=stored_file.content_type,
+    )
 
-async def delete_file(blob_reference):
     try:
-        container_name, blob_name = files.parse_blob_reference(blob_reference)
+        await files_repository.create(stored_file)
+    except Exception as exc:
+        try:
+            await _delete_blob_if_exists(stored_file)
+        except Exception:
+            logger.exception(
+                "Failed to rollback uploaded blob for file_id=%s user_id=%s",
+                stored_file.id,
+                user_id,
+            )
+        raise StorageBackendError("Failed to persist file metadata.") from exc
+
+    return stored_file.id
+
+
+async def delete_file(file_id: str, user_id: str) -> None:
+    stored_file = await files_repository.get_by_id(file_id=file_id, user_id=user_id)
+    if stored_file is None or stored_file.status != FileStatus.TEMP:
+        raise StorageNotFoundError("File not found.")
+
+    await _delete_blob_if_exists(stored_file)
+    deleted = await files_repository.delete_temp(file_id=file_id, user_id=user_id)
+    if deleted is None:
+        raise StorageDeleteError("Failed to delete temporary file metadata.")
+
+
+async def activate_files(
+    file_ids: list[str],
+    entity: StorageEntity,
+    entity_id: str,
+    user_id: str,
+) -> list[File]:
+    try:
+        return await files_repository.activate_for_entity(
+            file_ids=file_ids,
+            entity=entity,
+            entity_id=entity_id,
+            user_id=user_id,
+        )
     except ValueError as exc:
-        raise StorageDeleteError("Invalid blob reference.") from exc
-    await files.delete(scope=StorageScope.USER, blob_name=blob_name)
+        raise StorageUploadError(str(exc)) from exc
+
+
+async def cleanup_expired_temporary_files() -> int:
+    cutoff_ts = time.time() - TEMP_FILE_RETENTION_SECONDS
+    expired_files = await files_repository.list_expired_temp(cutoff_ts=cutoff_ts)
+    deleted_ids: list[str] = []
+    file_ids_by_scope: dict[StorageScope, list[str]] = defaultdict(list)
+
+    for stored_file in expired_files:
+        file_ids_by_scope[stored_file.storage_scope].append(stored_file.id)
+
+    for storage_scope, file_ids in file_ids_by_scope.items():
+        try:
+            deleted_ids.extend(
+                await files.delete_many(file_ids=file_ids, scope=storage_scope)
+            )
+        except Exception:
+            logger.exception(
+                "Failed to delete expired blobs for scope=%s file_ids=%s",
+                storage_scope,
+                file_ids,
+            )
+
+    if deleted_ids:
+        await files_repository.delete_many_by_ids(deleted_ids)
+
+    return len(deleted_ids)
