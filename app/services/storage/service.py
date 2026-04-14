@@ -91,6 +91,18 @@ async def activate_files(
         raise StorageUploadError(str(exc)) from exc
 
 
+async def download_file(file_id: str, user_id: str) -> tuple[File, bytes]:
+    stored_file = await files_repository.get_by_id(file_id=file_id, user_id=user_id)
+    if stored_file is None:
+        raise StorageNotFoundError("File not found.")
+
+    data = await files.download(file_id=stored_file.id, scope=stored_file.storage_scope)
+    if data is None:
+        raise StorageNotFoundError("File data not found in storage backend.")
+
+    return stored_file, data
+
+
 async def cleanup_expired_temporary_files() -> int:
     cutoff_ts = time.time() - TEMP_FILE_RETENTION_SECONDS
     expired_files = await files_repository.list_expired_temp(cutoff_ts=cutoff_ts)

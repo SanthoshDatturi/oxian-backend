@@ -69,12 +69,5 @@ async def list_latest_by_chat(chat_id: str, limit: int = 20) -> list[Message]:
     return list(reversed(documents))
 
 
-async def list_by_process(process_id: str) -> list[Message]:
-    cursor = get_messages_collection().find({"process_id": process_id}).sort(
-        "created_at", 1
-    )
-    return [Message.model_validate(document) async for document in cursor]
-
-
 async def delete_by_chat(chat_id: str) -> None:
     await get_messages_collection().delete_many({"chat_id": chat_id})

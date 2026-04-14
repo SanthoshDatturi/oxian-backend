@@ -9,8 +9,6 @@ from pydantic import AliasChoices, BaseModel, Field
 class State(StrEnum):
     PENDING = "pending"
     RUNNING = "running"
-    STOPPED = "stopped"
-    COMPLETED = "completed"
     FAILED = "failed"
 
 
@@ -34,4 +32,3 @@ class Process(BaseModel):
     error: ProcessError | None = None
     created_at: float = Field(default_factory=time.time)
     updated_at: float = Field(default_factory=time.time)
-    completed_at: float | None = None

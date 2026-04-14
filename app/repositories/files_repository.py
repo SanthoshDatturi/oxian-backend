@@ -48,6 +48,18 @@ async def get_by_id(file_id: str, user_id: str) -> File | None:
     return File.model_validate(document)
 
 
+async def get_many_by_ids(file_ids: list[str], user_id: str) -> list[File]:
+    normalized_ids = _dedupe_file_ids(file_ids)
+    if not normalized_ids:
+        return []
+    cursor = get_files_collection().find(
+        {"_id": {"$in": normalized_ids}, "user_id": user_id}
+    )
+    files = [File.model_validate(document) async for document in cursor]
+    files_by_id = {file.id: file for file in files}
+    return [files_by_id[file_id] for file_id in normalized_ids if file_id in files_by_id]
+
+
 async def activate_for_entity(
     file_ids: list[str],
     entity: StorageEntity,

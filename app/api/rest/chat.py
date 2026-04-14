@@ -1,9 +1,17 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+import json
 
-from app.core.dependencies import authenticate_rest
+from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import StreamingResponse
+
+from app.core.dev.dependencies import authenticate_rest
 from app.repositories import chat_repository, message_repository
 from app.schemas.chat import Chat
-from app.schemas.message import Message
+from app.schemas.message import ChatMessageInput, Message, NewChatMessageInput
+from app.services.chat import (
+    start_existing_chat_turn,
+    start_new_chat_turn,
+    stop_chat_turn,
+)
 
 router = APIRouter(prefix="/chats", tags=["Chats"])
 
@@ -13,6 +21,85 @@ def _get_user_id(user_payload: dict) -> str:
     if not user_id:
         raise HTTPException(status_code=401, detail="Invalid authentication token")
     return user_id
+
+
+def _format_sse(event: str, data: dict) -> str:
+    return f"event: {event}\ndata: {json.dumps(data, ensure_ascii=True)}\n\n"
+
+
+@router.post("/messages")
+async def create_chat_message(
+    payload: NewChatMessageInput,
+    user_payload: dict = Depends(authenticate_rest),
+):
+    user_id = _get_user_id(user_payload)
+    try:
+        session = await start_new_chat_turn(user_id=user_id, payload=payload)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+    async def event_stream():
+        yield _format_sse("meta", session.meta)
+        while True:
+            event = await session.events.get()
+            if event is None:
+                break
+            yield _format_sse(event["event"], event["data"])
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "Connection": "keep-alive"},
+    )
+
+
+@router.post("/{chat_id}/messages")
+async def add_chat_message(
+    chat_id: str,
+    payload: ChatMessageInput,
+    user_payload: dict = Depends(authenticate_rest),
+):
+    user_id = _get_user_id(user_payload)
+    try:
+        session = await start_existing_chat_turn(
+            user_id=user_id,
+            chat_id=chat_id,
+            payload=payload,
+        )
+    except ValueError as exc:
+        detail = str(exc)
+        status_code = 404 if "not found" in detail.lower() else 400
+        raise HTTPException(status_code=status_code, detail=detail)
+
+    async def event_stream():
+        yield _format_sse("meta", session.meta)
+        while True:
+            event = await session.events.get()
+            if event is None:
+                break
+            yield _format_sse(event["event"], event["data"])
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "Connection": "keep-alive"},
+    )
+
+
+@router.post("/{chat_id}/stop")
+async def stop_chat_message(
+    chat_id: str,
+    user_payload: dict = Depends(authenticate_rest),
+):
+    user_id = _get_user_id(user_payload)
+    try:
+        stopped = await stop_chat_turn(user_id=user_id, chat_id=chat_id)
+    except ValueError as exc:
+        detail = str(exc)
+        status_code = 404 if "not found" in detail.lower() else 400
+        raise HTTPException(status_code=status_code, detail=detail)
+
+    return {"stopped": stopped}
 
 
 @router.get("/", response_model=list[Chat])

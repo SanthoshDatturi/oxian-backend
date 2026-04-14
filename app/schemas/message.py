@@ -5,6 +5,7 @@ from uuid import uuid4
 
 from pydantic import AliasChoices, BaseModel, Field
 
+from app.schemas.chat import ChatMode
 from app.schemas.generic_types import LatLang
 
 
@@ -33,15 +34,9 @@ class TextPart(BaseModel):
 
 class FilePart(BaseModel):
     type: Literal[PartType.FILE] = PartType.FILE
-    blob_reference: str
-    filename: str
-    mime_type: str
-    media_kind: FileMediaKind
+    file_id: str
+    media_kind: FileMediaKind | None = None
     caption: str | None = None
-    extracted_text: str | None = Field(
-        default=None,
-        description="Text summary/transcript persisted for future history reuse.",
-    )
 
 
 class LocationPart(BaseModel):
@@ -62,6 +57,22 @@ MessagePart = Annotated[
 ]
 
 
+IncomingMessagePart = Annotated[
+    TextPart | FilePart | LocationPart,
+    Field(discriminator="type"),
+]
+
+
+class NewChatMessageInput(BaseModel):
+    mode: ChatMode
+    parts: list[IncomingMessagePart]
+    farm_profile_id: str | None = None
+
+
+class ChatMessageInput(BaseModel):
+    parts: list[IncomingMessagePart]
+
+
 class MessageUsage(BaseModel):
     input_tokens: int | None = None
     output_tokens: int | None = None
@@ -76,14 +87,6 @@ class MessageError(BaseModel):
     details: dict[str, Any] | None = None
 
 
-class MessageStatus(StrEnum):
-    PENDING = "pending"
-    STREAMING = "streaming"
-    COMPLETE = "complete"
-    STOPPED = "stopped"
-    ERROR = "error"
-
-
 class Message(BaseModel):
     id: str = Field(
         default_factory=lambda: uuid4().hex,
@@ -93,7 +96,6 @@ class Message(BaseModel):
     chat_id: str
     user_id: str
     role: Role
-    status: MessageStatus = MessageStatus.PENDING
     parts: list[MessagePart] = Field(default_factory=list)
     usage: MessageUsage | None = None
     error: MessageError | None = None

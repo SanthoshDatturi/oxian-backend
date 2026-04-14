@@ -1,14 +1,11 @@
 import time
 
 from app.integrations.database.mogodb import get_processes_collection
-from app.schemas.process import Process, State
+from app.schemas.process import Process
 
 
 def _touch(process: Process) -> Process:
-    updates: dict[str, float | None] = {"updated_at": time.time()}
-    if process.status == State.COMPLETED and process.completed_at is None:
-        updates["completed_at"] = time.time()
-    return process.model_copy(update=updates)
+    return process.model_copy(update={"updated_at": time.time()})
 
 
 async def create(process: Process) -> Process:

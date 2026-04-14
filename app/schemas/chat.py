@@ -17,6 +17,9 @@ class Chat(BaseModel):
         serialization_alias="_id",
     )
     user_id: str
+    mode: ChatMode = ChatMode.GENERAL
+    farm_profile_id: str | None = None
+    process_id: str | None = None
     title: str
     created_at: float = Field(default_factory=time.time)
     updated_at: float = Field(default_factory=time.time)
