@@ -41,6 +41,19 @@ async def create(file: File) -> File:
     return file
 
 
+async def save_active_file(file: File, entity: StorageEntity) -> File:
+    if file.status != FileStatus.ACTIVE:
+        raise ValueError("File must be active.")
+    if not file.entity_id:
+        raise ValueError("Entity id is required.")
+
+    await _validate_entity(entity=entity, entity_id=file.entity_id, user_id=file.user_id)
+    await get_files_collection().insert_one(
+        file.model_dump(by_alias=True, exclude_none=True, mode="json")
+    )
+    return file
+
+
 async def get_by_id(file_id: str, user_id: str) -> File | None:
     document = await get_files_collection().find_one({"_id": file_id, "user_id": user_id})
     if not document:

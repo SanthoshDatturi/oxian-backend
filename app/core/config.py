@@ -24,6 +24,9 @@ class Settings(BaseSettings):
     )
     OPENWEATHERMAP_API_KEY: Optional[str] = os.getenv("OPENWEATHERMAP_API_KEY")
     GEMINI_CHAT_MODEL: str = os.getenv("GEMINI_CHAT_MODEL", "gemini-2.5-flash")
+    GEMINI_TTS_MODEL: str = os.getenv(
+        "GEMINI_TTS_MODEL", "gemini-2.5-flash-preview-tts"
+    )
     CHAT_HISTORY_LIMIT: int = int(os.getenv("CHAT_HISTORY_LIMIT", "16"))
 
 
