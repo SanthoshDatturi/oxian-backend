@@ -260,16 +260,21 @@ async def _build_prompt(
 ) -> str:
     preference = await user_pref_repository.get_by_user_id(user_id)
     response_language_code = preference.language_code if preference else None
-    return PromptManager.get_prompt(
-        "chat",
-        current_date=str(date.today()),
-        mode=mode.value,
-        user_id=user_id,
-        response_language_code=response_language_code,
-        chat_title=chat_title,
-        continuation_text=None,
-        farm_profile_schema_json=json.dumps(FarmProfile.model_json_schema(), indent=2),
-    )
+    # `mode` is used for server-side branching in the template. We pass only
+    # the fields required by the selected mode to reduce prompt tokens.
+    prompt_kwargs: dict[str, Any] = {
+        "current_date": str(date.today()),
+        "mode": mode.value,
+        "response_language_code": response_language_code,
+        "chat_title": chat_title,
+    }
+    if mode == ChatMode.FARM_SURVEY:
+        prompt_kwargs["user_id"] = user_id
+        prompt_kwargs["farm_profile_schema_json"] = json.dumps(
+            FarmProfile.model_json_schema(),
+            indent=2,
+        )
+    return PromptManager.get_prompt("chat", **prompt_kwargs)
 
 
 async def _run_turn(
