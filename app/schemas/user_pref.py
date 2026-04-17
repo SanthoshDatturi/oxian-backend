@@ -12,5 +12,6 @@ class UserPreference(BaseModel):
     )
     user_id: str
     language_code: str | None = None
+    voice_response_enabled: bool = False
     created_at: float = Field(default_factory=time.time)
     updated_at: float = Field(default_factory=time.time)

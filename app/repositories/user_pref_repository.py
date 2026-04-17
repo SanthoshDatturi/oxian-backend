@@ -23,14 +23,3 @@ async def save(preference: UserPreference) -> UserPreference:
         upsert=True,
     )
     return preference
-
-
-async def upsert_language_code(user_id: str, language_code: str | None) -> UserPreference:
-    preference = await get_by_user_id(user_id)
-    if preference is None:
-        preference = UserPreference(user_id=user_id, language_code=language_code)
-    else:
-        preference = preference.model_copy(
-            update={"language_code": language_code, "updated_at": time.time()}
-        )
-    return await save(preference)
