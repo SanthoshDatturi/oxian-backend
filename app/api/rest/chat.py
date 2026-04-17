@@ -3,7 +3,7 @@ import json
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 
-from app.core.dev.dependencies import authenticate_rest
+from app.core.dependencies import authenticate_rest
 from app.repositories import chat_repository, message_repository
 from app.schemas.chat import Chat
 from app.schemas.message import ChatMessageInput, Message, NewChatMessageInput
