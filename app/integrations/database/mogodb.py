@@ -10,11 +10,17 @@ _client: AsyncIOMotorClient | None = None
 _database: AsyncIOMotorDatabase | None = None
 
 
+def _get_mongo_uri() -> str:
+    mongo_uri = settings.MONGO_URI or settings.MONGO_DIRECT_URI
+    if not mongo_uri:
+        raise ValueError("Mongo connection string is not configured.")
+    return mongo_uri
+
+
 async def init_mongo_client() -> None:
     global _client, _database
     if _client is None:
-        mongo_uri = settings.MONGO_DIRECT_URI or settings.MONGO_URI
-        _client = AsyncIOMotorClient(mongo_uri, uuidRepresentation="standard")
+        _client = AsyncIOMotorClient(_get_mongo_uri(), uuidRepresentation="standard")
     if _database is None:
         _database = _client[settings.MONGO_DB_NAME]
 
@@ -30,8 +36,7 @@ async def close_mongo_client() -> None:
 def _get_collection(collection_name: str) -> AsyncIOMotorCollection:
     global _client, _database
     if _client is None:
-        mongo_uri = settings.MONGO_DIRECT_URI or settings.MONGO_URI
-        _client = AsyncIOMotorClient(mongo_uri, uuidRepresentation="standard")
+        _client = AsyncIOMotorClient(_get_mongo_uri(), uuidRepresentation="standard")
     if _database is None:
         _database = _client[settings.MONGO_DB_NAME]
     return _database[collection_name]
