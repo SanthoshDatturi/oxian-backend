@@ -25,6 +25,10 @@ def _looks_like_private_key(value: str) -> bool:
     return "-----BEGIN PRIVATE KEY-----" in value
 
 
+def _normalize_private_key(private_key: str) -> str:
+    return private_key.replace("\\n", "\n").strip()
+
+
 def _service_account_from_split_env(private_key: str) -> dict:
     client_email = settings.FIREBASE_CLIENT_EMAIL
 
@@ -38,10 +42,26 @@ def _service_account_from_split_env(private_key: str) -> dict:
     return {
         "type": "service_account",
         "project_id": settings.FIREBASE_PROJECT_ID,
-        "private_key": private_key,
+        "private_key": _normalize_private_key(private_key),
         "client_email": client_email,
         "token_uri": "https://oauth2.googleapis.com/token",
     }
+
+
+def _certificate_from_payload(payload: dict):
+    if isinstance(payload.get("private_key"), str):
+        payload = {
+            **payload,
+            "private_key": _normalize_private_key(payload["private_key"]),
+        }
+
+    try:
+        return credentials.Certificate(payload)
+    except ValueError as exc:
+        raise FirebaseAuthError(
+            "Firebase service account private key is not a valid PEM value. "
+            "Check FIREBASE_SERVICE_ACCOUNT_JSON formatting."
+        ) from exc
 
 
 @lru_cache(maxsize=1)
@@ -59,7 +79,7 @@ def _get_credentials():
 
         if _looks_like_private_key(raw_service_account):
             payload = _service_account_from_split_env(raw_service_account)
-            return credentials.Certificate(payload)
+            return _certificate_from_payload(payload)
 
         try:
             payload = json.loads(raw_service_account)
@@ -69,7 +89,7 @@ def _get_credentials():
                 "JSON object, not a raw private key or another value."
             ) from exc
 
-        return credentials.Certificate(payload)
+        return _certificate_from_payload(payload)
 
     return credentials.ApplicationDefault()
 
@@ -104,13 +124,14 @@ def initialize_firebase():
 
 
 async def verify_id_token(id_token: str) -> dict:
-
-    app = initialize_firebase()
-
     try:
+        app = initialize_firebase()
         decoded = await run_in_threadpool(auth.verify_id_token, id_token, app, True)
 
         return decoded
+
+    except FirebaseAuthError as exc:
+        raise AuthProviderError("Firebase authentication is not configured") from exc
 
     except auth.InvalidIdTokenError as exc:
         raise InvalidTokenError("Invalid authentication token") from exc
