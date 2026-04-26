@@ -10,9 +10,7 @@ load_dotenv()
 class Settings(BaseSettings):
     CONCURRENCY_LIMIT: int = 5
     FIREBASE_PROJECT_ID: Optional[str] = os.getenv("FIREBASE_PROJECT_ID")
-    FIREBASE_SERVICE_ACCOUNT_PATH: Optional[str] = os.getenv(
-        "FIREBASE_SERVICE_ACCOUNT_PATH"
-    )
+    FIREBASE_CLIENT_EMAIL: Optional[str] = os.getenv("FIREBASE_CLIENT_EMAIL")
     FIREBASE_SERVICE_ACCOUNT_JSON: Optional[str] = os.getenv(
         "FIREBASE_SERVICE_ACCOUNT_JSON"
     )

@@ -21,28 +21,55 @@ class FirebaseAuthError(Exception):
     """Raised when something goes wrong while talking to Firebase Auth."""
 
 
+def _looks_like_private_key(value: str) -> bool:
+    return "-----BEGIN PRIVATE KEY-----" in value
+
+
+def _service_account_from_split_env(private_key: str) -> dict:
+    client_email = settings.FIREBASE_CLIENT_EMAIL
+
+    if not settings.FIREBASE_PROJECT_ID or not client_email:
+        raise FirebaseAuthError(
+            "FIREBASE_SERVICE_ACCOUNT_JSON contains a private key, not JSON. "
+            "Set FIREBASE_PROJECT_ID and FIREBASE_CLIENT_EMAIL, or replace "
+            "FIREBASE_SERVICE_ACCOUNT_JSON with the full service account JSON."
+        )
+
+    return {
+        "type": "service_account",
+        "project_id": settings.FIREBASE_PROJECT_ID,
+        "private_key": private_key,
+        "client_email": client_email,
+        "token_uri": "https://oauth2.googleapis.com/token",
+    }
+
+
 @lru_cache(maxsize=1)
 def _get_credentials():
     """
     Resolve Firebase credentials from environment configuration.
     Supports:
         - JSON env var
-        - service account file
+        - private key plus FIREBASE_PROJECT_ID and FIREBASE_CLIENT_EMAIL
         - application default credentials
     """
 
     if settings.FIREBASE_SERVICE_ACCOUNT_JSON:
+        raw_service_account = settings.FIREBASE_SERVICE_ACCOUNT_JSON.strip()
+
+        if _looks_like_private_key(raw_service_account):
+            payload = _service_account_from_split_env(raw_service_account)
+            return credentials.Certificate(payload)
+
         try:
-            payload = json.loads(settings.FIREBASE_SERVICE_ACCOUNT_JSON)
+            payload = json.loads(raw_service_account)
         except json.JSONDecodeError as exc:
             raise FirebaseAuthError(
-                "FIREBASE_SERVICE_ACCOUNT_JSON is not valid JSON"
+                "FIREBASE_SERVICE_ACCOUNT_JSON must be a full service account "
+                "JSON object, not a raw private key or another value."
             ) from exc
 
         return credentials.Certificate(payload)
-
-    if settings.FIREBASE_SERVICE_ACCOUNT_PATH:
-        return credentials.Certificate(settings.FIREBASE_SERVICE_ACCOUNT_PATH)
 
     return credentials.ApplicationDefault()
 
