@@ -102,13 +102,23 @@ async def stop_chat_message(
     return {"stopped": stopped}
 
 
-@router.get("/", response_model=list[Chat])
+@router.get(
+    "/",
+    response_model=list[Chat],
+    response_model_exclude={"__all__": {"user_id"}},
+    response_model_exclude_none=True,
+)
 async def list_chats(user_payload: dict = Depends(authenticate_rest)) -> list[Chat]:
     user_id = _get_user_id(user_payload)
     return await chat_repository.list_by_user(user_id)
 
 
-@router.get("/{chat_id}", response_model=Chat)
+@router.get(
+    "/{chat_id}",
+    response_model=Chat,
+    response_model_exclude={"user_id"},
+    response_model_exclude_none=True,
+)
 async def get_chat(
     chat_id: str, user_payload: dict = Depends(authenticate_rest)
 ) -> Chat:
@@ -129,7 +139,12 @@ async def delete_chat(chat_id: str, user_payload: dict = Depends(authenticate_re
     return
 
 
-@router.get("/{chat_id}/messages", response_model=list[Message])
+@router.get(
+    "/{chat_id}/messages",
+    response_model=list[Message],
+    response_model_exclude={"__all__": {"user_id"}},
+    response_model_exclude_none=True,
+)
 async def list_messages(
     chat_id: str,
     user_payload: dict = Depends(authenticate_rest),

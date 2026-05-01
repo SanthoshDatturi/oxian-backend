@@ -107,7 +107,12 @@ def _generate_backend_title(parts: list[IncomingMessagePart]) -> str:
 
 
 def _serialize_message(message: Message) -> dict[str, Any]:
-    return message.model_dump(by_alias=True, mode="json")
+    return message.model_dump(
+        by_alias=True,
+        exclude={"user_id"},
+        exclude_none=True,
+        mode="json",
+    )
 
 
 def _format_part_for_history(part: Any) -> str:
