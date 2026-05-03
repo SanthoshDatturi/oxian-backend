@@ -1,4 +1,5 @@
 import json
+import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
@@ -14,6 +15,7 @@ from app.services.chat import (
 )
 
 router = APIRouter(prefix="/chats", tags=["Chats"])
+logger = logging.getLogger(__name__)
 
 
 def _get_user_id(user_payload: dict) -> str:
@@ -37,6 +39,12 @@ async def create_chat_message(
         session = await start_new_chat_turn(user_id=user_id, payload=payload)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
+    except Exception:
+        logger.exception("Failed to start new chat turn")
+        raise HTTPException(
+            status_code=500,
+            detail="Unable to start chat response right now.",
+        )
 
     async def event_stream():
         yield _format_sse("meta", session.meta)
@@ -70,6 +78,12 @@ async def add_chat_message(
         detail = str(exc)
         status_code = 404 if "not found" in detail.lower() else 400
         raise HTTPException(status_code=status_code, detail=detail)
+    except Exception:
+        logger.exception("Failed to start chat turn chat_id=%s", chat_id)
+        raise HTTPException(
+            status_code=500,
+            detail="Unable to start chat response right now.",
+        )
 
     async def event_stream():
         yield _format_sse("meta", session.meta)

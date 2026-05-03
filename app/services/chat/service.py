@@ -44,6 +44,7 @@ from app.schemas.message import (
     IncomingMessagePart,
     LocationPart,
     Message,
+    MessageError,
     NewChatMessageInput,
     PartType,
     Role,
@@ -113,6 +114,45 @@ def _serialize_message(message: Message) -> dict[str, Any]:
         exclude_none=True,
         mode="json",
     )
+
+
+def _chat_error_payload(code: str, message: str) -> dict[str, str]:
+    return {
+        "code": code,
+        "message": message,
+    }
+
+
+async def _persist_and_emit_turn_error(
+    *,
+    process: Process,
+    assistant_message: Message,
+    events: asyncio.Queue[dict[str, Any] | None],
+    code: str,
+    user_message: str,
+    process_message: str,
+) -> None:
+    error_payload = _chat_error_payload(code, user_message)
+    message_error = MessageError(code=code, message=user_message)
+    assistant_message = assistant_message.model_copy(
+        update={
+            "error": message_error,
+            "parts": [TextPart(text=user_message)],
+        }
+    )
+    assistant_message = await message_repository.save(assistant_message)
+
+    process.status = State.FAILED
+    process.error = ProcessError(code=code, message=process_message)
+    await process_repository.save(process)
+
+    await events.put(
+        _sse_event(
+            "message",
+            {"message": _serialize_message(assistant_message)},
+        )
+    )
+    await events.put(_sse_event("error", error_payload))
 
 
 def _format_part_for_history(part: Any) -> str:
@@ -462,35 +502,20 @@ async def _run_turn(
             )
         await events.put(_sse_event("message", message_event_data))
         await events.put(_sse_event("done", {}))
-    except ValidationError as exc:
+    except ValidationError:
         logger.exception(
             "Validation error while processing chat turn process_id=%s", process.id
         )
-        assistant_message = assistant_message.model_copy(
-            update={
-                "error": {
-                    "code": "validation_error",
-                    "message": "Failed to validate generated response.",
-                    "details": {"errors": exc.errors()},
-                },
-                "parts": [],
-            }
-        )
-        await message_repository.save(assistant_message)
-        process.status = State.FAILED
-        process.error = ProcessError(
+        await _persist_and_emit_turn_error(
+            process=process,
+            assistant_message=assistant_message,
+            events=events,
             code="validation_error",
-            message="Validation failed during agent execution.",
-        )
-        await process_repository.save(process)
-        await events.put(
-            _sse_event(
-                "error",
-                {
-                    "code": "validation_error",
-                    "message": "Validation failed during processing.",
-                },
-            )
+            user_message=(
+                "I couldn't complete this response because something didn't format "
+                "correctly. Please try again."
+            ),
+            process_message="Validation failed during agent execution.",
         )
     except asyncio.CancelledError:
         logger.info("Chat turn was cancelled process_id=%s", process.id)
@@ -503,30 +528,15 @@ async def _run_turn(
             )
     except Exception:
         logger.exception("Failed to process chat turn process_id=%s", process.id)
-        assistant_message = assistant_message.model_copy(
-            update={
-                "error": {
-                    "code": "agent_error",
-                    "message": "Failed to process message.",
-                },
-                "parts": [],
-            }
-        )
-        await message_repository.save(assistant_message)
-        process.status = State.FAILED
-        process.error = ProcessError(
+        await _persist_and_emit_turn_error(
+            process=process,
+            assistant_message=assistant_message,
+            events=events,
             code="agent_error",
-            message="Failed to process chat turn.",
-        )
-        await process_repository.save(process)
-        await events.put(
-            _sse_event(
-                "error",
-                {
-                    "code": "agent_error",
-                    "message": "Unable to complete the request right now.",
-                },
-            )
+            user_message=(
+                "I couldn't complete this response right now. Please try again."
+            ),
+            process_message="Failed to process chat turn.",
         )
     finally:
         process_manager.remove(process.id)
