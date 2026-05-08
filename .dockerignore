@@ -1,0 +1,46 @@
+# Version Control
+.git
+.gitignore
+
+# Virtual Environments and Packages
+.venv
+__pycache__
+*.py[oc]
+*.egg-info
+.python-version
+
+# IDE and Editor Files
+.vscode
+.idea
+*.iml
+
+# Environment Variables and Secrets
+.env
+.env.*
+
+# Documentation and Guides
+README.md
+guides
+docs
+
+# Testing and Coverage
+tests
+.pytest_cache
+.ruff_cache
+.mypy_cache
+.coverage
+htmlcov
+
+# Temporary and Cache files
+.cache
+build
+dist
+wheels
+thoughts
+grounding_metadata
+dev
+
+# Docker related
+Dockerfile
+docker-compose.yml
+.dockerignore
