@@ -58,6 +58,12 @@ async def generate_tts_file(
         message = await message_repository.get_by_id(entity_id)
         if message is None or message.user_id != user_id:
             raise ValueError("Message not found.")
+
+        # Check if audio part already exists for the message
+        for part in message.parts:
+            if isinstance(part, FilePart) and part.media_kind == FileMediaKind.AUDIO:
+                return part.file_id
+
         prompt_payload = text_or_json_data
         storage_entity = StorageEntity.CHAT
         storage_entity_id = message.chat_id
@@ -71,11 +77,20 @@ async def generate_tts_file(
         raise ValueError("Unsupported TTS mode.")
 
     prompt = _build_prompt(mode=mode, text_or_json_data=prompt_payload)
+    
+    transcript_response = await ChatGoogleGenerativeAI(
+        model=settings.GEMINI_CHAT_MODEL,
+    ).ainvoke(prompt)
+    
+    transcript = transcript_response.content
+    if not isinstance(transcript, str) or not transcript.strip():
+        raise StorageBackendError("Failed to generate valid transcript for TTS.")
+
     tts_response = await ChatGoogleGenerativeAI(
         model=settings.GEMINI_TTS_MODEL,
         response_modalities=["AUDIO"],
     ).ainvoke(
-        prompt,
+        transcript,
         speech_config={
             "voice_config": {
                 "prebuilt_voice_config": {"voice_name": TTS_VOICE_NAME}
