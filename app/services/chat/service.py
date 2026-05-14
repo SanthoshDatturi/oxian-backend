@@ -1,11 +1,13 @@
 import asyncio
-import base64
+import io
 import json
 import logging
 from dataclasses import dataclass
 from datetime import date
 from typing import Any, cast
 
+from google import genai
+from google.genai import types as genai_types
 from langchain.agents import create_agent
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage
 from langchain_core.tools import tool
@@ -87,7 +89,40 @@ def _infer_media_kind(mime_type: str) -> FileMediaKind:
         return FileMediaKind.IMAGE
     if mime_type.startswith("audio/"):
         return FileMediaKind.AUDIO
-    return FileMediaKind.DOCUMENT
+    return FileMediaKind.FILE
+
+
+def _upload_model_file_sync(
+    *,
+    filename: str,
+    mime_type: str,
+    data: bytes,
+) -> str:
+    with genai.Client() as client:
+        uploaded_file = client.files.upload(
+            file=io.BytesIO(data),
+            config=genai_types.UploadFileConfig(
+                display_name=filename,
+                mime_type=mime_type,
+            ),
+        )
+    if not uploaded_file.uri:
+        raise RuntimeError("Gemini file upload did not return a file URI.")
+    return uploaded_file.uri
+
+
+async def _upload_model_file(
+    *,
+    filename: str,
+    mime_type: str,
+    data: bytes,
+) -> str:
+    return await asyncio.to_thread(
+        _upload_model_file_sync,
+        filename=filename,
+        mime_type=mime_type,
+        data=data,
+    )
 
 
 def _generate_backend_title(parts: list[IncomingMessagePart]) -> str:
@@ -221,7 +256,7 @@ async def _build_user_message(
     incoming_file_ids = [
         part.file_id for part in parts if isinstance(part, FilePart)
     ]
-    file_lookup: dict[str, tuple[str, str]] = {}
+    file_lookup: dict[str, tuple[str, str, FileMediaKind]] = {}
     file_blocks: dict[str, dict[str, Any]] = {}
 
     if incoming_file_ids:
@@ -236,12 +271,21 @@ async def _build_user_message(
                 file_id=stored_file.id,
                 user_id=user_id,
             )
-            file_lookup[stored_file.id] = (data_file.filename, data_file.content_type)
+            media_kind = _infer_media_kind(data_file.content_type)
+            model_file_uri = await _upload_model_file(
+                filename=data_file.filename,
+                mime_type=data_file.content_type,
+                data=data_bytes,
+            )
+            file_lookup[stored_file.id] = (
+                data_file.filename,
+                data_file.content_type,
+                media_kind,
+            )
             file_blocks[stored_file.id] = {
-                "type": "file",
-                "source_type": "base64",
+                "type": FileMediaKind.FILE.value,
+                "file_id": model_file_uri,
                 "mime_type": data_file.content_type,
-                "data": base64.b64encode(data_bytes).decode("utf-8"),
             }
 
     message_parts: list[Any] = []
@@ -265,10 +309,15 @@ async def _build_user_message(
             continue
 
         if isinstance(part, FilePart):
-            filename, mime_type = file_lookup.get(
-                part.file_id, ("uploaded-file", "application/octet-stream")
+            filename, mime_type, inferred_media_kind = file_lookup.get(
+                part.file_id,
+                (
+                    "uploaded-file",
+                    "application/octet-stream",
+                    FileMediaKind.FILE,
+                ),
             )
-            media_kind = part.media_kind or _infer_media_kind(mime_type)
+            media_kind = part.media_kind or inferred_media_kind
             message_parts.append(
                 FilePart(
                     file_id=part.file_id,

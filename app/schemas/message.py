@@ -24,7 +24,7 @@ class PartType(StrEnum):
 class FileMediaKind(StrEnum):
     IMAGE = "image"
     AUDIO = "audio"
-    DOCUMENT = "document"
+    FILE = "file"
 
 
 class TextPart(BaseModel):
