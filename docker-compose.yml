@@ -9,7 +9,10 @@ services:
       - mongo_data:/data/db
 
   backend:
-    build: .
+    image: oxian:local
+    pull_policy: missing
+    build:
+      context: .
     container_name: oxian-backend
     restart: unless-stopped
     ports:
