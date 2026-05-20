@@ -11,6 +11,7 @@ from app.prompts.prompt_manager import PromptManager
 from app.repositories import files_repository, message_repository
 from app.schemas.file import File, FileStatus
 from app.schemas.message import FileMediaKind, FilePart
+from app.services import storage_service
 
 logger = logging.getLogger(__name__)
 
@@ -144,8 +145,7 @@ async def generate_tts_file(
             await message_repository.save(message)
         except Exception as exc:
             try:
-                await files.delete(scope=stored_file.storage_scope, file_id=stored_file.id)
-                await files_repository.delete_many_by_ids([stored_file.id])
+                await storage_service._delete_files([stored_file])
             except Exception:
                 logger.exception(
                     "Failed to rollback TTS file after message update failure file_id=%s message_id=%s",

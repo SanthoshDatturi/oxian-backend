@@ -160,6 +160,16 @@ async def delete(scope: StorageScope, file_id: str):
         raise error_type("Failed to delete file.") from exc
 
 
+async def _blob_exists(file_id: str, scope: StorageScope) -> bool:
+    container_client = await get_container_client(scope.value)
+    blob_client = container_client.get_blob_client(file_id)
+    try:
+        await blob_client.get_blob_properties()
+        return True
+    except ResourceNotFoundError:
+        return False
+
+
 async def delete_many(
     file_ids: list[str],
     scope: StorageScope = StorageScope.USER,
@@ -190,5 +200,43 @@ async def delete_many(
                     scope,
                 )
         return deleted_ids
+    except ValueError as exc:
+        raise StorageBackendError("Storage configuration error.") from exc
+
+
+async def delete_many_confirmed(
+    file_ids: list[str],
+    scope: StorageScope = StorageScope.USER,
+) -> list[str]:
+    """
+    Delete blobs and return only ids confirmed absent from storage.
+    """
+    try:
+        container_client = await get_container_client(scope.value)
+        confirmed_ids: list[str] = []
+        for file_id in file_ids:
+            blob_client = container_client.get_blob_client(file_id)
+            try:
+                await blob_client.delete_blob()
+            except AzureError as exc:
+                error_type = _map_azure_error(exc, operation="delete")
+                if error_type is not StorageNotFoundError:
+                    logger.exception(
+                        "Failed to delete blob file_id=%s scope=%s",
+                        file_id,
+                        scope,
+                    )
+                    continue
+
+            try:
+                if not await _blob_exists(file_id=file_id, scope=scope):
+                    confirmed_ids.append(file_id)
+            except AzureError:
+                logger.exception(
+                    "Failed to confirm blob deletion file_id=%s scope=%s",
+                    file_id,
+                    scope,
+                )
+        return confirmed_ids
     except ValueError as exc:
         raise StorageBackendError("Storage configuration error.") from exc

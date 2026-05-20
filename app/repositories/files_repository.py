@@ -1,4 +1,5 @@
 from pymongo import ASCENDING
+from pymongo import ReturnDocument
 
 from app.integrations.database.mogodb import get_files_collection
 from app.integrations.storage.base import StorageEntity
@@ -96,6 +97,8 @@ async def activate_for_entity(
         raise ValueError("One or more files were not found.")
 
     for file in files:
+        if file.status == FileStatus.DELETING:
+            raise ValueError("File is being deleted.")
         if file.entity_id and file.entity_id != entity_id:
             raise ValueError("File is already attached to another entity.")
 
@@ -117,21 +120,35 @@ async def list_by_entity(entity_id: str, user_id: str) -> list[File]:
     return [File.model_validate(document) async for document in cursor]
 
 
-async def delete_temp(file_id: str, user_id: str) -> File | None:
-    document = await get_files_collection().find_one_and_delete(
-        {"_id": file_id, "user_id": user_id, "status": FileStatus.TEMP.value}
+async def mark_temp_deleting(file_id: str, user_id: str) -> File | None:
+    document = await get_files_collection().find_one_and_update(
+        {"_id": file_id, "user_id": user_id, "status": FileStatus.TEMP.value},
+        {"$set": {"status": FileStatus.DELETING.value}},
+        return_document=ReturnDocument.AFTER,
     )
     if not document:
         return None
     return File.model_validate(document)
 
 
-async def delete_by_entity_id(entity_id: str, user_id: str) -> list[File]:
-    files = await list_by_entity(entity_id=entity_id, user_id=user_id)
-    if not files:
+async def mark_many_deleting(file_ids: list[str]) -> list[File]:
+    normalized_ids = _dedupe_file_ids(file_ids)
+    if not normalized_ids:
         return []
-    await delete_many_by_ids([file.id for file in files])
-    return files
+
+    await get_files_collection().update_many(
+        {"_id": {"$in": normalized_ids}},
+        {"$set": {"status": FileStatus.DELETING.value}},
+    )
+    cursor = get_files_collection().find({"_id": {"$in": normalized_ids}})
+    files = [File.model_validate(document) async for document in cursor]
+    files_by_id = {file.id: file for file in files}
+    return [files_by_id[file_id] for file_id in normalized_ids if file_id in files_by_id]
+
+
+async def list_deleting() -> list[File]:
+    cursor = get_files_collection().find({"status": FileStatus.DELETING.value})
+    return [File.model_validate(document) async for document in cursor]
 
 
 async def list_expired_temp(cutoff_ts: float) -> list[File]:

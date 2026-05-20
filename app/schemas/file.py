@@ -11,6 +11,7 @@ from app.integrations.storage.base import StorageScope
 class FileStatus(StrEnum):
     TEMP = "temp"
     ACTIVE = "active"
+    DELETING = "deleting"
 
 
 class File(BaseModel):

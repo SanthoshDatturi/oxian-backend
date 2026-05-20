@@ -40,9 +40,9 @@ from app.schemas.farm_profile import (
 )
 from app.schemas.message import (
     ChatMessageInput,
+    FarmProfileReferencePart,
     FileMediaKind,
     FilePart,
-    FarmProfileReferencePart,
     IncomingMessagePart,
     LocationPart,
     Message,
@@ -253,9 +253,7 @@ async def _build_user_message(
     chat_id: str,
     parts: list[IncomingMessagePart],
 ) -> tuple[Message, list[dict[str, Any]]]:
-    incoming_file_ids = [
-        part.file_id for part in parts if isinstance(part, FilePart)
-    ]
+    incoming_file_ids = [part.file_id for part in parts if isinstance(part, FilePart)]
     file_lookup: dict[str, tuple[str, str, FileMediaKind]] = {}
     file_blocks: dict[str, dict[str, Any]] = {}
 
@@ -771,14 +769,19 @@ async def list_chat_messages(
 
 
 async def delete_chat_by_id(*, user_id: str, chat_id: str) -> bool:
-    deleted = await chat_repository.delete(chat_id, user_id=user_id)
-    if not deleted:
+    chat = await chat_repository.get_by_id(chat_id, user_id=user_id)
+    if chat is None:
         return False
 
-    await message_repository.delete_by_chat(chat_id)
     await storage_service._delete_files_by_entity(
         entity_id=chat_id,
         user_id=user_id,
     )
+
+    await message_repository.delete_by_chat(chat_id)
+
+    deleted = await chat_repository.delete(chat_id, user_id=user_id)
+    if not deleted:
+        return False
 
     return True
