@@ -9,9 +9,8 @@ from app.integrations.storage.errors import (
     StorageNotFoundError,
     StorageUploadError,
 )
-from app.services.storage import service
-from app.services.tts import service as tts_service
-from app.services.tts.service import TtsMode
+from app.services import storage_service, tts_service
+from app.services.tts_service import TtsMode
 
 router = APIRouter(prefix="/files", tags=["Files"])
 
@@ -63,7 +62,7 @@ async def upload_file(
     resolved_mime_type = mime_type or file.content_type
 
     try:
-        file_id = await service.upload_file(
+        file_id = await storage_service.upload_file(
             file_stream=file.file,
             filename=resolved_filename,
             user_id=user_id,
@@ -93,7 +92,7 @@ async def delete_file(
         raise HTTPException(status_code=401, detail="Invalid authentication token")
 
     try:
-        await service.delete_file(
+        await storage_service.delete_file(
             file_id=file_id,
             user_id=user_id,
         )

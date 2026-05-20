@@ -8,7 +8,7 @@ from app.core.dependencies import authenticate_rest
 from app.repositories import chat_repository, message_repository
 from app.schemas.chat import Chat
 from app.schemas.message import ChatMessageInput, Message, NewChatMessageInput
-from app.services.chat import (
+from app.services.chat_service import (
     start_existing_chat_turn,
     start_new_chat_turn,
     stop_chat_turn,

@@ -11,7 +11,7 @@ from app.api.rest.user_pref import router as user_pref_router
 from app.core.simple_queue import worker
 from app.integrations.database.mogodb import close_mongo_client, init_mongo_client
 from app.repositories import files_repository
-from app.services.storage import service as storage_service
+from app.services import storage_service
 
 logger = logging.getLogger(__name__)
 

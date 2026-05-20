@@ -53,7 +53,7 @@ from app.schemas.message import (
     TextPart,
 )
 from app.schemas.process import Process, ProcessError, State
-from app.services.storage import service as storage_service
+from app.services import storage_service
 
 logger = logging.getLogger(__name__)
 
