@@ -4,10 +4,10 @@ from contextlib import asynccontextmanager, suppress
 
 from fastapi import FastAPI
 
-from app.api.rest.chat import router as chat_router
-from app.api.rest.farm_profile import router as farm_profile_router
-from app.api.rest.files import router as files_router
-from app.api.rest.user_pref import router as user_pref_router
+from app.api.rest.chat_api import router as chat_router
+from app.api.rest.farm_profile_api import router as farm_profile_router
+from app.api.rest.files_api import router as files_router
+from app.api.rest.user_pref_api import router as user_pref_router
 from app.core.simple_queue import worker
 from app.integrations.database.mogodb import close_mongo_client, init_mongo_client
 from app.repositories import files_repository
