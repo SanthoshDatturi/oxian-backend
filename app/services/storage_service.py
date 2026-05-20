@@ -33,6 +33,10 @@ async def upload_file(
     user_id: str,
     mime_type: str | None = None,
 ) -> str:
+    """
+    Public upload API. Use this at external boundaries where raw request data
+    needs to become temporary storage owned by the authenticated user.
+    """
     stored_file = File(
         user_id=user_id,
         filename=filename,
@@ -40,6 +44,17 @@ async def upload_file(
         status=FileStatus.TEMP,
     )
 
+    stored_file = await _upload_file(file_stream=file_stream, stored_file=stored_file)
+    return stored_file.id
+
+
+async def _upload_file(
+    file_stream: Union[bytes, IO[bytes]],
+    stored_file: File,
+) -> File:
+    """
+    Private upload API for callers that have already built trusted metadata.
+    """
     await files.upload(
         file_stream=file_stream,
         file_id=stored_file.id,
@@ -56,14 +71,18 @@ async def upload_file(
             logger.exception(
                 "Failed to rollback uploaded blob for file_id=%s user_id=%s",
                 stored_file.id,
-                user_id,
+                stored_file.user_id,
             )
         raise StorageBackendError("Failed to persist file metadata.") from exc
 
-    return stored_file.id
+    return stored_file
 
 
 async def delete_file(file_id: str, user_id: str) -> None:
+    """
+    Public delete API. Validates that the file belongs to the user and is still
+    temporary before removing it.
+    """
     stored_file = await files_repository.get_by_id(file_id=file_id, user_id=user_id)
     if stored_file is None or stored_file.status != FileStatus.TEMP:
         raise StorageNotFoundError("File not found.")
@@ -74,12 +93,25 @@ async def delete_file(file_id: str, user_id: str) -> None:
         raise StorageDeleteError("Failed to delete temporary file metadata.")
 
 
-async def activate_files(
+async def _delete_file(stored_file: File) -> None:
+    """
+    Private delete API for callers that already validated the File object.
+    """
+    await _delete_blob_if_exists(stored_file)
+    deleted_count = await files_repository.delete_many_by_ids([stored_file.id])
+    if deleted_count == 0:
+        raise StorageDeleteError("Failed to delete file metadata.")
+
+
+async def _activate_files(
     file_ids: list[str],
     entity: StorageEntity,
     entity_id: str,
     user_id: str,
 ) -> list[File]:
+    """
+    Private activation API for internal services.
+    """
     try:
         return await files_repository.activate_for_entity(
             file_ids=file_ids,
@@ -92,10 +124,20 @@ async def activate_files(
 
 
 async def download_file(file_id: str, user_id: str) -> tuple[File, bytes]:
+    """
+    Public download API. Validates ownership before reading blob data.
+    """
     stored_file = await files_repository.get_by_id(file_id=file_id, user_id=user_id)
     if stored_file is None:
         raise StorageNotFoundError("File not found.")
 
+    return await _download_file(stored_file)
+
+
+async def _download_file(stored_file: File) -> tuple[File, bytes]:
+    """
+    Private download API for callers that already validated the File object.
+    """
     data = await files.download(file_id=stored_file.id, scope=stored_file.storage_scope)
     if data is None:
         raise StorageNotFoundError("File data not found in storage backend.")

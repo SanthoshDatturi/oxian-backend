@@ -260,17 +260,14 @@ async def _build_user_message(
     file_blocks: dict[str, dict[str, Any]] = {}
 
     if incoming_file_ids:
-        activated_files = await storage_service.activate_files(
+        activated_files = await storage_service._activate_files(
             file_ids=incoming_file_ids,
             entity=StorageEntity.CHAT,
             entity_id=chat_id,
             user_id=user_id,
         )
         for stored_file in activated_files:
-            data_file, data_bytes = await storage_service.download_file(
-                file_id=stored_file.id,
-                user_id=user_id,
-            )
+            data_file, data_bytes = await storage_service._download_file(stored_file)
             media_kind = _infer_media_kind(data_file.content_type)
             model_file_uri = await _upload_model_file(
                 filename=data_file.filename,
