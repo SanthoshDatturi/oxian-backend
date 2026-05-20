@@ -740,3 +740,45 @@ async def stop_chat_turn(*, user_id: str, chat_id: str) -> bool:
             chat_id,
         )
     return True
+
+
+async def list_user_chats(*, user_id: str) -> list[Chat]:
+    return await chat_repository.list_by_user(user_id)
+
+
+async def get_chat_by_id(*, user_id: str, chat_id: str) -> Chat | None:
+    return await chat_repository.get_by_id(chat_id, user_id=user_id)
+
+
+async def list_chat_messages(
+    *,
+    user_id: str,
+    chat_id: str,
+    limit: int = 50,
+    since: float | None = None,
+) -> list[Message]:
+    chat = await get_chat_by_id(user_id=user_id, chat_id=chat_id)
+    if chat is None:
+        raise ValueError("Chat not found.")
+
+    if since is not None:
+        return await message_repository.list_by_chat_since(
+            chat_id=chat_id,
+            since=since,
+            limit=limit,
+        )
+    return await message_repository.list_latest_by_chat(chat_id, limit=limit)
+
+
+async def delete_chat_by_id(*, user_id: str, chat_id: str) -> bool:
+    deleted = await chat_repository.delete(chat_id, user_id=user_id)
+    if not deleted:
+        return False
+
+    await message_repository.delete_by_chat(chat_id)
+    await storage_service._delete_files_by_entity(
+        entity_id=chat_id,
+        user_id=user_id,
+    )
+
+    return True

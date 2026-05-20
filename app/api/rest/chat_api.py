@@ -5,10 +5,13 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 
 from app.core.dependencies import authenticate_rest
-from app.repositories import chat_repository, message_repository
 from app.schemas.chat import Chat
 from app.schemas.message import ChatMessageInput, Message, NewChatMessageInput
 from app.services.chat_service import (
+    delete_chat_by_id,
+    get_chat_by_id,
+    list_chat_messages,
+    list_user_chats,
     start_existing_chat_turn,
     start_new_chat_turn,
     stop_chat_turn,
@@ -124,7 +127,7 @@ async def stop_chat_message(
 )
 async def list_chats(user_payload: dict = Depends(authenticate_rest)) -> list[Chat]:
     user_id = _get_user_id(user_payload)
-    return await chat_repository.list_by_user(user_id)
+    return await list_user_chats(user_id=user_id)
 
 
 @router.get(
@@ -137,7 +140,7 @@ async def get_chat(
     chat_id: str, user_payload: dict = Depends(authenticate_rest)
 ) -> Chat:
     user_id = _get_user_id(user_payload)
-    chat = await chat_repository.get_by_id(chat_id, user_id=user_id)
+    chat = await get_chat_by_id(chat_id=chat_id, user_id=user_id)
     if chat is None:
         raise HTTPException(status_code=404, detail="Chat not found")
     return chat
@@ -146,11 +149,9 @@ async def get_chat(
 @router.delete("/{chat_id}", status_code=204)
 async def delete_chat(chat_id: str, user_payload: dict = Depends(authenticate_rest)):
     user_id = _get_user_id(user_payload)
-    deleted = await chat_repository.delete(chat_id, user_id=user_id)
+    deleted = await delete_chat_by_id(chat_id=chat_id, user_id=user_id)
     if not deleted:
         raise HTTPException(status_code=404, detail="Chat not found")
-    await message_repository.delete_by_chat(chat_id)
-    return
 
 
 @router.get(
@@ -166,11 +167,12 @@ async def list_messages(
     since: float | None = Query(default=None, ge=0),
 ) -> list[Message]:
     user_id = _get_user_id(user_payload)
-    chat = await chat_repository.get_by_id(chat_id, user_id=user_id)
-    if chat is None:
-        raise HTTPException(status_code=404, detail="Chat not found")
-    if since is not None:
-        return await message_repository.list_by_chat_since(
-            chat_id=chat_id, since=since, limit=limit
+    try:
+        return await list_chat_messages(
+            chat_id=chat_id,
+            user_id=user_id,
+            limit=limit,
+            since=since,
         )
-    return await message_repository.list_latest_by_chat(chat_id, limit=limit)
+    except ValueError:
+        raise HTTPException(status_code=404, detail="Chat not found")

@@ -1,8 +1,10 @@
+import asyncio
 import logging
 import time
 from collections import defaultdict
 from typing import IO, Union
 
+from app.core.simple_queue import enqueue
 from app.integrations.storage import files
 from app.integrations.storage.base import StorageEntity, StorageScope
 from app.integrations.storage.errors import (
@@ -103,6 +105,95 @@ async def _delete_file(stored_file: File) -> None:
         raise StorageDeleteError("Failed to delete file metadata.")
 
 
+async def _delete_files(
+    stored_files: list[File],
+    *,
+    fail_on_partial: bool = True,
+    queue_retry: bool = False,
+) -> int:
+    if not stored_files:
+        return 0
+
+    file_ids = [stored_file.id for stored_file in stored_files]
+
+    async def _delete_once() -> int:
+        deleted_ids: list[str] = []
+        file_ids_by_scope: dict[StorageScope, list[str]] = defaultdict(list)
+
+        for stored_file in stored_files:
+            file_ids_by_scope[stored_file.storage_scope].append(stored_file.id)
+
+        for storage_scope, scoped_file_ids in file_ids_by_scope.items():
+            try:
+                deleted_ids.extend(
+                    await files.delete_many(
+                        file_ids=scoped_file_ids,
+                        scope=storage_scope,
+                    )
+                )
+            except Exception:
+                logger.exception(
+                    "Failed to delete blobs for scope=%s file_ids=%s",
+                    storage_scope,
+                    scoped_file_ids,
+                )
+
+        if deleted_ids:
+            await files_repository.delete_many_by_ids(deleted_ids)
+
+        if fail_on_partial and len(deleted_ids) != len(stored_files):
+            raise StorageDeleteError("Some file deletions failed.")
+
+        return len(deleted_ids)
+
+    try:
+        return await _delete_once()
+    except Exception:
+        if not queue_retry:
+            raise
+
+        logger.exception("Failed to delete files, queuing cleanup file_ids=%s", file_ids)
+
+    async def _retry_cleanup() -> None:
+        delays = (1, 5, 15)
+
+        for attempt in range(1, 4):
+            try:
+                await _delete_files(stored_files, fail_on_partial=True)
+                return
+            except Exception:
+                logger.exception(
+                    "File cleanup failed (attempt %s/3) for file_ids=%s",
+                    attempt,
+                    file_ids,
+                )
+                if attempt < 3:
+                    await asyncio.sleep(delays[attempt - 1])
+
+        logger.error(
+            "File cleanup permanently failed after retries for file_ids=%s",
+            file_ids,
+        )
+
+    await enqueue(_retry_cleanup)
+    return 0
+
+
+async def _delete_files_by_entity(entity_id: str, user_id: str) -> None:
+    """
+    Private delete API that retries cleanup asynchronously on storage failures.
+    """
+    stored_files = await files_repository.list_by_entity(
+        entity_id=entity_id,
+        user_id=user_id,
+    )
+    await _delete_files(
+        stored_files,
+        fail_on_partial=True,
+        queue_retry=True,
+    )
+
+
 async def _activate_files(
     file_ids: list[str],
     entity: StorageEntity,
@@ -148,25 +239,4 @@ async def _download_file(stored_file: File) -> tuple[File, bytes]:
 async def cleanup_expired_temporary_files() -> int:
     cutoff_ts = time.time() - TEMP_FILE_RETENTION_SECONDS
     expired_files = await files_repository.list_expired_temp(cutoff_ts=cutoff_ts)
-    deleted_ids: list[str] = []
-    file_ids_by_scope: dict[StorageScope, list[str]] = defaultdict(list)
-
-    for stored_file in expired_files:
-        file_ids_by_scope[stored_file.storage_scope].append(stored_file.id)
-
-    for storage_scope, file_ids in file_ids_by_scope.items():
-        try:
-            deleted_ids.extend(
-                await files.delete_many(file_ids=file_ids, scope=storage_scope)
-            )
-        except Exception:
-            logger.exception(
-                "Failed to delete expired blobs for scope=%s file_ids=%s",
-                storage_scope,
-                file_ids,
-            )
-
-    if deleted_ids:
-        await files_repository.delete_many_by_ids(deleted_ids)
-
-    return len(deleted_ids)
+    return await _delete_files(expired_files, fail_on_partial=False)
