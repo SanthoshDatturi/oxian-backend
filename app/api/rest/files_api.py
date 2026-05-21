@@ -22,7 +22,6 @@ class FileUploadResponse(BaseModel):
 class TtsFileRequest(BaseModel):
     mode: TtsMode
     entity_id: str
-    text_or_json_data: str
 
 
 def _raise_for_storage_error(exc: Exception):
@@ -119,7 +118,6 @@ async def generate_tts_file(
         file_id = await tts_service.generate_tts_file(
             entity_id=payload.entity_id,
             mode=payload.mode,
-            text_or_json_data=payload.text_or_json_data,
             user_id=user_id,
         )
     except ValueError as exc:

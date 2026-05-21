@@ -7,10 +7,9 @@ from app.core.config import settings
 from app.integrations.storage import files
 from app.integrations.storage.base import StorageEntity, StorageScope
 from app.integrations.storage.errors import StorageBackendError, StorageUploadError
-from app.prompts.prompt_manager import PromptManager
 from app.repositories import files_repository, message_repository
 from app.schemas.file import File, FileStatus
-from app.schemas.message import FileMediaKind, FilePart
+from app.schemas.message import FileMediaKind, FilePart, Message, TextPart
 from app.services import storage_service
 
 logger = logging.getLogger(__name__)
@@ -24,14 +23,6 @@ class TtsMode(StrEnum):
     CROP = "crop"
 
 
-def _build_prompt(*, mode: TtsMode, text_or_json_data: str) -> str:
-    return PromptManager.get_prompt(
-        "tts",
-        mode=mode.value,
-        text_or_json_data=text_or_json_data,
-    )
-
-
 def _extract_audio_bytes(audio_payload: object) -> bytes:
     if isinstance(audio_payload, bytes):
         return audio_payload
@@ -42,20 +33,28 @@ def _extract_audio_bytes(audio_payload: object) -> bytes:
     raise StorageUploadError("TTS model did not return audio bytes.")
 
 
+def _extract_message_text(message: Message) -> str:
+    text_parts = [
+        part.text.strip()
+        for part in message.parts
+        if isinstance(part, TextPart) and part.text.strip()
+    ]
+    if not text_parts:
+        raise ValueError("Message does not contain text to convert to speech.")
+    return "\n\n".join(text_parts)
+
+
 async def generate_tts_file(
     *,
     entity_id: str,
     mode: TtsMode,
-    text_or_json_data: str | None,
     user_id: str,
 ) -> str:
     storage_entity: StorageEntity
     storage_entity_id: str
-    prompt_payload: str
+    tts_input: str
 
     if mode == TtsMode.MESSAGE:
-        if not text_or_json_data or not text_or_json_data.strip():
-            raise ValueError("text_or_json_data is required.")
         message = await message_repository.get_by_id(entity_id)
         if message is None or message.user_id != user_id:
             raise ValueError("Message not found.")
@@ -65,33 +64,19 @@ async def generate_tts_file(
             if isinstance(part, FilePart) and part.media_kind == FileMediaKind.AUDIO:
                 return part.file_id
 
-        prompt_payload = text_or_json_data
+        tts_input = _extract_message_text(message)
         storage_entity = StorageEntity.CHAT
         storage_entity_id = message.chat_id
     elif mode == TtsMode.CROP:
-        if not text_or_json_data or not text_or_json_data.strip():
-            raise ValueError("text_or_json_data is required.")
-        prompt_payload = text_or_json_data
-        storage_entity = StorageEntity.CROP
-        storage_entity_id = entity_id
+        raise ValueError("Crop TTS is not supported yet.")
     else:
         raise ValueError("Unsupported TTS mode.")
-
-    prompt = _build_prompt(mode=mode, text_or_json_data=prompt_payload)
-    
-    transcript_response = await ChatGoogleGenerativeAI(
-        model=settings.GEMINI_CHAT_MODEL,
-    ).ainvoke(prompt)
-    
-    transcript = transcript_response.content
-    if not isinstance(transcript, str) or not transcript.strip():
-        raise StorageBackendError("Failed to generate valid transcript for TTS.")
 
     tts_response = await ChatGoogleGenerativeAI(
         model=settings.GEMINI_TTS_MODEL,
         response_modalities=["AUDIO"],
     ).ainvoke(
-        transcript,
+        tts_input,
         speech_config={
             "voice_config": {
                 "prebuilt_voice_config": {"voice_name": TTS_VOICE_NAME}
