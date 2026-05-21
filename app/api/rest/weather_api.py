@@ -9,7 +9,6 @@ from app.schemas.weather import (
     AirPollutionResponse,
     CurrentWeatherResponse,
     ForecastResponse,
-    GeocodingResponse,
     WeatherMapResponse,
 )
 
@@ -81,21 +80,6 @@ async def get_air_pollution(
     return await _fetch_weather_data(
         open_weather.get_air_pollution,
         "Air pollution data not found",
-        lat,
-        lon,
-    )
-
-
-@router.get("/reverse-geocoding", response_model=list[GeocodingResponse])
-async def get_reverse_geocoding(
-    lat: float = Query(..., ge=-90, le=90),
-    lon: float = Query(..., ge=-180, le=180),
-    user_payload: dict = Depends(authenticate_rest),
-) -> list[GeocodingResponse]:
-    _get_user_id(user_payload)
-    return await _fetch_weather_data(
-        open_weather.get_reverse_geocoding,
-        "Reverse geocoding data not found",
         lat,
         lon,
     )
