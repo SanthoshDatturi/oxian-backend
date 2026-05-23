@@ -116,6 +116,10 @@ def get_files_collection() -> AsyncIOMotorCollection:
     return _get_collection("files")
 
 
+def get_crop_images_collection() -> AsyncIOMotorCollection:
+    return _get_collection("crop_images")
+
+
 def get_farm_profiles_collection() -> AsyncIOMotorCollection:
     return _get_collection("farm_profiles")
 
