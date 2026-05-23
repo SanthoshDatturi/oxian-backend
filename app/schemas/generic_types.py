@@ -1,3 +1,5 @@
+from enum import StrEnum
+
 from pydantic import BaseModel, Field
 
 
@@ -8,3 +10,8 @@ class LatLang(BaseModel):
     longitude: float = Field(
         description="The longitude in degrees. It must be in the range [-180.0, +180.0].",
     )
+
+
+class PersistenceLanguages(StrEnum):
+    ENGLISH = "english"
+    USER_LANGUAGE = "user_language"

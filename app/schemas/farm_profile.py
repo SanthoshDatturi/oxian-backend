@@ -254,22 +254,8 @@ class PreviousCrops(BaseModel):
     )
 
 
-class FarmProfile(BaseModel):
-    """
-    Represents the complete profile of a farm including location,
-    land characteristics, irrigation resources, soil health, and cropping history.
-    """
-
-    id: str = Field(
-        default_factory=lambda: uuid4().hex,
-        description="Unique identifier for the farm profile.",
-        validation_alias=AliasChoices("id", "_id"),
-        serialization_alias="_id",
-    )
-
-    user_id: str = Field(
-        description="Unique identifier of the farmer who owns or manages the farm."
-    )
+class FarmProfileFields(BaseModel):
+    """Represents the core fields of a farm profile excluding metadata."""
 
     name: str = Field(
         description="Name or nickname used to identify the farm. Example: Green Valley Farm"
@@ -309,4 +295,54 @@ class FarmProfile(BaseModel):
             "Detailed soil test results including nutrient levels and soil characteristics."
             "Should upload images or PDF documents of the test, extract from them."
         ),
+    )
+
+
+class FarmProfile(FarmProfileFields):
+    """
+    Represents the complete profile of a farm including both core fields and metadata such as unique identifiers and ownership information.
+    This model is used for API responses and includes all necessary information to represent a farm profile in the system.
+    """
+
+    id: str = Field(
+        default_factory=lambda: uuid4().hex,
+        description="Unique identifier for the farm profile.",
+        validation_alias=AliasChoices("id", "_id"),
+        serialization_alias="_id",
+    )
+
+    user_id: str = Field(
+        description="Unique identifier of the farmer who owns or manages the farm."
+    )
+
+
+class PersistenceFarmProfile(BaseModel):
+    """
+    Represents the farm profile data structure used for persistence in the database.
+    This model is designed to be stored as a single document in a NoSQL database like MongoDB.
+    """
+
+    id: str = Field(
+        default_factory=lambda: uuid4().hex,
+        description="Unique identifier for the farm profile.",
+        validation_alias=AliasChoices("id", "_id"),
+        serialization_alias="_id",
+    )
+
+    user_id: str = Field(
+        description="Unique identifier of the farmer who owns or manages the farm."
+    )
+
+    english: FarmProfileFields = Field(
+        description=(
+            "Farm profile fields with descriptions and values in formal and proper English language, used for analysis and reasoning. "
+            "Units should be same as provided by the user in both languages."
+        )
+    )
+
+    user_language: FarmProfileFields = Field(
+        description=(
+            "Farm profile fields with descriptions and values in the farmer's preferred language for better understanding for user. "
+            "Units should be same as provided by the user in both languages."
+        )
     )
