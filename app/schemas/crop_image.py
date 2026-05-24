@@ -1,5 +1,6 @@
 import time
 from typing import List, Optional
+from uuid import uuid4
 
 from pydantic import AliasChoices, BaseModel, Field, field_validator
 
@@ -8,7 +9,7 @@ from app.core.config import settings
 
 class CropImageFile(BaseModel):
     id: str = Field(
-        description="ID of the crop image File.",
+        default_factory=lambda: uuid4().hex,
         validation_alias=AliasChoices("id", "_id"),
         serialization_alias="_id",
     )
@@ -31,7 +32,6 @@ class CropImageFile(BaseModel):
 
 class RetrievedCropImageFile(BaseModel):
     id: str = Field(
-        description="ID of the crop image File.",
         validation_alias=AliasChoices("id", "_id"),
         serialization_alias="_id",
     )

@@ -25,6 +25,9 @@ class Settings(BaseSettings):
     GEMINI_TTS_MODEL: str = os.getenv(
         "GEMINI_TTS_MODEL", "gemini-2.5-flash-preview-tts"
     )
+    CROP_IMAGE_EMBEDDING_MODEL: str = os.getenv(
+        "CROP_IMAGE_EMBEDDING_MODEL", "gemini-embedding-001"
+    )
     CHAT_HISTORY_LIMIT: int = int(os.getenv("CHAT_HISTORY_LIMIT", "16"))
     CROP_IMAGE_EMBEDDING_DIMENSION: int = 512
 
