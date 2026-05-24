@@ -12,6 +12,6 @@ class LatLang(BaseModel):
     )
 
 
-class PersistenceLanguages(StrEnum):
+class PersistenceLanguage(StrEnum):
     ENGLISH = "english"
     USER_LANGUAGE = "user_language"

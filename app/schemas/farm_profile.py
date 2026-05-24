@@ -298,6 +298,22 @@ class FarmProfileFields(BaseModel):
     )
 
 
+class TranslatedFarmProfileFields(BaseModel):
+    english: FarmProfileFields = Field(
+        description=(
+            "Farm profile fields with descriptions and values in formal and proper English language, used for analysis and reasoning. "
+            "Units should be same as provided by the user in both languages."
+        )
+    )
+
+    user_language: FarmProfileFields = Field(
+        description=(
+            "Farm profile fields with descriptions and values in the farmer's preferred language for better understanding for user. "
+            "Units should be same as provided by the user in both languages."
+        )
+    )
+
+
 class FarmProfile(FarmProfileFields):
     """
     Represents the complete profile of a farm including both core fields and metadata such as unique identifiers and ownership information.
@@ -316,7 +332,7 @@ class FarmProfile(FarmProfileFields):
     )
 
 
-class PersistenceFarmProfile(BaseModel):
+class PersistenceFarmProfile(TranslatedFarmProfileFields):
     """
     Represents the farm profile data structure used for persistence in the database.
     This model is designed to be stored as a single document in a NoSQL database like MongoDB.
@@ -331,18 +347,4 @@ class PersistenceFarmProfile(BaseModel):
 
     user_id: str = Field(
         description="Unique identifier of the farmer who owns or manages the farm."
-    )
-
-    english: FarmProfileFields = Field(
-        description=(
-            "Farm profile fields with descriptions and values in formal and proper English language, used for analysis and reasoning. "
-            "Units should be same as provided by the user in both languages."
-        )
-    )
-
-    user_language: FarmProfileFields = Field(
-        description=(
-            "Farm profile fields with descriptions and values in the farmer's preferred language for better understanding for user. "
-            "Units should be same as provided by the user in both languages."
-        )
     )

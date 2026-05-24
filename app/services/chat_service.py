@@ -12,7 +12,7 @@ from langchain.agents import create_agent
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage
 from langchain_core.tools import tool
 from langchain_google_genai import ChatGoogleGenerativeAI
-from pydantic import BaseModel, ValidationError
+from pydantic import ValidationError
 
 from app.core.config import settings
 from app.core.process_manager import process_manager
@@ -22,22 +22,12 @@ from app.integrations.weather import open_weather
 from app.prompts.prompt_manager import PromptManager
 from app.repositories import (
     chat_repository,
-    farm_profile_repository,
     message_repository,
     process_repository,
     user_pref_repository,
 )
 from app.schemas.chat import Chat, ChatMode
-from app.schemas.farm_profile import (
-    Area,
-    FarmProfile,
-    IrrigationSystem,
-    Location,
-    PreviousCrops,
-    SoilTestProperties,
-    SoilType,
-    WaterSource,
-)
+from app.schemas.farm_profile import FarmProfileFields, TranslatedFarmProfileFields
 from app.schemas.message import (
     ChatMessageInput,
     FarmProfileReferencePart,
@@ -53,7 +43,7 @@ from app.schemas.message import (
     TextPart,
 )
 from app.schemas.process import Process, ProcessError, State
-from app.services import storage_service
+from app.services import farm_profile_service, storage_service
 
 logger = logging.getLogger(__name__)
 
@@ -62,22 +52,6 @@ logger = logging.getLogger(__name__)
 class ChatStreamSession:
     meta: dict[str, Any]
     events: asyncio.Queue[dict[str, Any] | None]
-
-
-class FarmProfileToolPayload(BaseModel):
-    name: str
-    location: Location
-    soil_type: SoilType
-    total_area: Area
-    cultivated_area: Area
-    water_source: WaterSource
-    irrigation_system: IrrigationSystem | None = None
-    crops: list[PreviousCrops] | None = None
-    soil_test_properties: SoilTestProperties | None = None
-
-
-class SaveFarmProfileInput(BaseModel):
-    profile: FarmProfileToolPayload
 
 
 def _sse_event(event: str, data: dict[str, Any]) -> dict[str, Any]:
@@ -360,7 +334,7 @@ async def _build_prompt(
     if mode == ChatMode.FARM_SURVEY:
         prompt_kwargs["user_id"] = user_id
         prompt_kwargs["farm_profile_schema_json"] = json.dumps(
-            FarmProfile.model_json_schema(),
+            TranslatedFarmProfileFields.model_json_schema(),
             indent=2,
         )
     return PromptManager.get_prompt("chat", **prompt_kwargs)
@@ -399,35 +373,49 @@ async def _run_turn(
             chat_title=chat.title,
         )
 
-        @tool(args_schema=SaveFarmProfileInput)
-        async def save_farm_profile(profile: FarmProfileToolPayload) -> dict[str, str]:
+        @tool(args_schema=TranslatedFarmProfileFields)
+        async def save_farm_profile(
+            english: FarmProfileFields,
+            user_language: FarmProfileFields,
+        ) -> dict[str, str]:
             """Save a complete farm profile. Call only when all required FarmProfile fields are available."""
 
             nonlocal saved_farm_profile_part
             nonlocal active_chat
 
-            incoming_profile = profile.model_dump(mode="json")
-
             if active_chat.farm_profile_id:
-                existing = await farm_profile_repository.get_by_id(
+                existing_english = await farm_profile_service._get_farm_profile(
                     active_chat.farm_profile_id,
                     user_id=active_chat.user_id,
                 )
-                if existing is None:
-                    raise ValueError("Linked farm profile was not found.")
-                merged = _deep_merge(
-                    existing.model_dump(mode="json", by_alias=False),
-                    incoming_profile,
+                existing_user_language = await farm_profile_service.get_farm_profile(
+                    active_chat.farm_profile_id,
+                    user_id=active_chat.user_id,
                 )
-                merged["id"] = existing.id
-                merged["user_id"] = active_chat.user_id
-                farm_profile = FarmProfile.model_validate(merged)
-                saved = await farm_profile_repository.save(farm_profile)
+                if existing_english is None or existing_user_language is None:
+                    raise ValueError("Linked farm profile was not found.")
+                merged_english = _deep_merge(
+                    existing_english.model_dump(mode="json", by_alias=False),
+                    english.model_dump(mode="json"),
+                )
+                merged_user_language = _deep_merge(
+                    existing_user_language.model_dump(mode="json", by_alias=False),
+                    user_language.model_dump(mode="json"),
+                )
+                saved = await farm_profile_service._update_translated_farm_profile(
+                    farm_id=active_chat.farm_profile_id,
+                    user_id=active_chat.user_id,
+                    english=FarmProfileFields.model_validate(merged_english),
+                    user_language=FarmProfileFields.model_validate(
+                        merged_user_language
+                    ),
+                )
             else:
-                merged = dict(incoming_profile)
-                merged["user_id"] = active_chat.user_id
-                farm_profile = FarmProfile.model_validate(merged)
-                saved = await farm_profile_repository.create(farm_profile)
+                saved = await farm_profile_service._create_translated_farm_profile(
+                    user_id=active_chat.user_id,
+                    english=english,
+                    user_language=user_language,
+                )
                 active_chat = active_chat.model_copy(
                     update={"farm_profile_id": saved.id}
                 )
