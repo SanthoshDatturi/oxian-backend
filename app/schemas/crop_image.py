@@ -41,3 +41,23 @@ class RetrievedCropImageFile(BaseModel):
     aliases: Optional[List[str]] = Field(
         default=None, description="List of alternative names for the crop."
     )
+
+
+class HybridCropImageSearchResult(BaseModel):
+    """Represents crop image matches found by both lexical and semantic search for one requested crop name."""
+
+    crop_name: str = Field(
+        description="Original crop name query provided by the caller. Example: Rice"
+    )
+    keyword_matches: list[RetrievedCropImageFile] = Field(
+        default_factory=list,
+        description=(
+            "Crop image records found by keyword search against crop names and aliases."
+        ),
+    )
+    similarity_matches: list[RetrievedCropImageFile] = Field(
+        default_factory=list,
+        description=(
+            "Crop image records found by vector similarity search using the crop query embedding."
+        ),
+    )

@@ -1,3 +1,4 @@
+import asyncio
 from typing import IO, Union
 
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
@@ -7,7 +8,10 @@ from app.integrations.storage import files
 from app.integrations.storage.base import StorageScope
 from app.integrations.storage.errors import StorageError
 from app.repositories import crop_image_repository
-from app.schemas.crop_image import CropImageFile
+from app.schemas.crop_image import (
+    CropImageFile,
+    HybridCropImageSearchResult,
+)
 
 
 def _normalize_aliases(aliases: list[str] | None) -> list[str] | None:
@@ -78,3 +82,33 @@ async def upload_new_image(
         raise exc
 
     return crop_image
+
+
+async def _search_crop_image(
+    crop_name: str,
+) -> HybridCropImageSearchResult | None:
+    normalized_crop_name = crop_name.strip()
+    if not normalized_crop_name:
+        return None
+
+    keyword_matches = await crop_image_repository.keyword_search(crop_name, limit=1)
+
+    embedding = await _generate_embedding(crop_name=normalized_crop_name, aliases=None)
+    similarity_matches = await crop_image_repository.similarity_search(
+        embedding,
+        limit=1,
+    )
+
+    return HybridCropImageSearchResult(
+        crop_name=crop_name,
+        keyword_matches=keyword_matches,
+        similarity_matches=similarity_matches,
+    )
+
+
+async def crops_image_search(
+    crop_names: list[str],
+) -> list[HybridCropImageSearchResult | None]:
+    return await asyncio.gather(
+        *(_search_crop_image(crop_name) for crop_name in crop_names)
+    )
