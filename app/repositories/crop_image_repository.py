@@ -2,6 +2,7 @@ import re
 from typing import Any
 
 from pymongo import ASCENDING, TEXT, ReturnDocument
+from pymongo.errors import OperationFailure
 
 from app.core.config import settings
 from app.integrations.database.mogodb import get_crop_images_collection
@@ -16,6 +17,11 @@ CROP_IMAGE_RETRIEVAL_PROJECTION: dict[str, int] = {
 }
 
 
+def _supports_search_indexes() -> bool:
+    mongo_uri = settings.MONGO_DIRECT_URI or settings.MONGO_URI
+    return "mongodb.net" in mongo_uri
+
+
 async def ensure_indexes() -> None:
     collection = get_crop_images_collection()
     await collection.create_index([("crop_name", ASCENDING)])
@@ -25,6 +31,9 @@ async def ensure_indexes() -> None:
         name=KEYWORD_TEXT_INDEX_NAME,
         default_language="none",
     )
+
+    if not _supports_search_indexes():
+        return
 
     try:
         from pymongo.operations import SearchIndexModel
@@ -48,7 +57,9 @@ async def ensure_indexes() -> None:
 
     try:
         await collection.create_search_index(model=vector_index)
-    except Exception:
+    except OperationFailure as exc:
+        if exc.code != 59:
+            raise
         # Atlas Search index creation is not available on every MongoDB deployment.
         # The CRUD and keyword indexes above are still valid for local/dev MongoDB.
         return
@@ -206,7 +217,7 @@ async def similarity_search(
     num_candidates: int | None = None,
 ) -> list[RetrievedCropImageFile]:
     _validate_embedding_dimension(embedding)
-    if limit <= 0:
+    if limit <= 0 or not _supports_search_indexes():
         return []
 
     candidates = num_candidates or max(limit * 10, 100)
