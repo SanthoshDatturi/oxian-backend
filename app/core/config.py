@@ -14,6 +14,8 @@ class Settings(BaseSettings):
     FIREBASE_SERVICE_ACCOUNT_JSON: Optional[str] = os.getenv(
         "FIREBASE_SERVICE_ACCOUNT_JSON"
     )
+    FIREBASE_WEB_API_KEY: Optional[str] = os.getenv("FIREBASE_WEB_API_KEY")
+    FIREBASE_AUTH_DOMAIN: Optional[str] = os.getenv("FIREBASE_AUTH_DOMAIN")
     MONGO_URI: str = os.environ.get("MONGO_URI", "")
     MONGO_DIRECT_URI: str = os.environ.get("MONGO_DIRECT_URI", "")
     MONGO_DB_NAME: str = os.environ.get("MONGO_DB_NAME", "")

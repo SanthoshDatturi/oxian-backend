@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Upload Crop Image</title>
+  <style>
+    :root {
+      --ink: #18201a;
+      --muted: #647067;
+      --line: #d9e2dc;
+      --field: #f7faf8;
+      --accent: #196f3d;
+      --danger: #a33422;
+      --page: #eef4ef;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--page);
+      color: var(--ink);
+      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 18px clamp(16px, 4vw, 48px);
+      border-bottom: 1px solid var(--line);
+      background: #fbfdfb;
+    }
+    header strong { font-size: 18px; }
+    main { width: min(760px, calc(100vw - 32px)); margin: 34px auto; }
+    form {
+      background: #fbfdfb;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 24px;
+      box-shadow: 0 18px 60px rgb(38 67 44 / 12%);
+    }
+    h1 { margin: 0 0 8px; font-size: 26px; letter-spacing: 0; }
+    p { margin: 0 0 22px; color: var(--muted); line-height: 1.45; }
+    label { display: block; margin: 16px 0 6px; font-weight: 650; }
+    input, textarea {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 12px;
+      background: var(--field);
+      color: var(--ink);
+      font: inherit;
+    }
+    textarea { min-height: 92px; resize: vertical; }
+    .actions { display: flex; gap: 10px; margin-top: 20px; }
+    button {
+      border: 0;
+      border-radius: 6px;
+      padding: 11px 14px;
+      font: inherit;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    button[type="submit"] { background: var(--accent); color: white; }
+    button[type="button"] { background: transparent; color: var(--ink); border: 1px solid var(--line); }
+    button:disabled { opacity: .64; cursor: progress; }
+    .status { min-height: 22px; margin-top: 14px; color: var(--muted); }
+    .error { color: var(--danger); }
+    .success { color: var(--accent); }
+  </style>
+</head>
+<body>
+  <header>
+    <strong>Crop Images</strong>
+    <button id="sign-out" type="button">Sign out</button>
+  </header>
+  <main>
+    <form id="upload-form">
+      <h1>Upload Crop Image</h1>
+      <p>Add a system crop reference image with names used for search and semantic matching.</p>
+      <label for="crop_name">Crop name</label>
+      <input id="crop_name" name="crop_name" required>
+      <label for="aliases">Aliases</label>
+      <textarea id="aliases" name="aliases" placeholder="Comma or line separated"></textarea>
+      <label for="file">Image</label>
+      <input id="file" name="file" type="file" accept="image/*" required>
+      <div class="actions">
+        <button id="submit" type="submit">Upload</button>
+      </div>
+      <div id="status" class="status"> </div>
+    </form>
+  </main>
+  <script id="firebase-config" type="application/json">{{ firebase_config_json|safe }}</script>
+  <script id="missing-config" type="application/json">{{ missing_config_json|safe }}</script>
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
+    import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js";
+
+    const firebaseConfig = JSON.parse(document.querySelector("#firebase-config").textContent);
+    const missingConfig = JSON.parse(document.querySelector("#missing-config").textContent);
+    const app = missingConfig ? null : initializeApp(firebaseConfig);
+    const auth = app ? getAuth(app) : null;
+    const form = document.querySelector("#upload-form");
+    const status = document.querySelector("#status");
+    const button = document.querySelector("#submit");
+
+    function setStatus(message, kind = "") {
+      status.textContent = message;
+      status.className = kind ? `status ${kind}` : "status";
+    }
+
+    if (missingConfig) {
+      setStatus("Firebase web configuration is missing on the server.", "error");
+      button.disabled = true;
+    }
+
+    async function requireAdmin(user) {
+      if (!user) {
+        window.location.assign("/admin/login");
+        return null;
+      }
+      const tokenResult = await user.getIdTokenResult(true);
+      if (tokenResult.claims.role !== "admin") {
+        await signOut(auth);
+        sessionStorage.removeItem("adminIdToken");
+        window.location.assign("/admin/login");
+        return null;
+      }
+      sessionStorage.setItem("adminIdToken", tokenResult.token);
+      return tokenResult.token;
+    }
+
+    if (auth) {
+      onAuthStateChanged(auth, async (user) => {
+        await requireAdmin(user);
+      });
+    }
+
+    document.querySelector("#sign-out").addEventListener("click", async () => {
+      if (!auth) return;
+      await signOut(auth);
+      sessionStorage.removeItem("adminIdToken");
+      window.location.assign("/admin/login");
+    });
+
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      button.disabled = true;
+      setStatus("Uploading...");
+      try {
+        if (!auth) throw new Error("Firebase web configuration is missing on the server.");
+        const token = sessionStorage.getItem("adminIdToken") || await requireAdmin(auth.currentUser);
+        if (!token) return;
+
+        const data = new FormData(form);
+        const response = await fetch("/admin/crop-images", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}` },
+          body: data,
+        });
+        const payload = await response.json().catch(() => ({ detail: "Upload failed." }));
+        if (!response.ok) {
+          throw new Error(payload.detail || "Upload failed.");
+        }
+        form.reset();
+        setStatus(`Uploaded ${payload.crop_name}.`, "success");
+      } catch (error) {
+        setStatus(error?.message || "Upload failed.", "error");
+      } finally {
+        button.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>
