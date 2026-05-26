@@ -4,12 +4,11 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 
 from app.core.config import settings
 from app.prompts.prompt_manager import PromptManager
-from app.repositories import farm_profile_repository
-from app.repositories import user_pref_repository
+from app.repositories import farm_profile_repository, user_pref_repository
 from app.schemas.farm_profile import (
     FarmProfile,
+    FarmProfileDocument,
     FarmProfileFields,
-    PersistenceFarmProfile,
     TranslatedFarmProfileFields,
 )
 from app.schemas.generic_types import PersistenceLanguage
@@ -44,18 +43,6 @@ async def _translate_farm_profile(
     return TranslatedFarmProfileFields.model_validate(response)
 
 
-def _farm_profile(
-    *,
-    profile_id: str | None = None,
-    user_id: str,
-    fields: FarmProfileFields,
-) -> FarmProfile:
-    data = {**fields.model_dump(mode="json"), "user_id": user_id}
-    if profile_id is not None:
-        data["id"] = profile_id
-    return FarmProfile.model_validate(data)
-
-
 async def list_all_farms(user_id: str, limit: int = 100) -> list[FarmProfile]:
     return await farm_profile_repository.list_by_user(
         user_id=user_id,
@@ -82,16 +69,20 @@ async def create_farm_profile(
         fields=fields,
         source_language=PersistenceLanguage.USER_LANGUAGE,
     )
-    persistence_profile = PersistenceFarmProfile(
+    profile_document = FarmProfileDocument(
         user_id=user_id,
         english=translated.english,
         user_language=translated.user_language,
     )
-    await farm_profile_repository.create(persistence_profile)
-    return _farm_profile(
-        profile_id=persistence_profile.id,
-        user_id=user_id,
-        fields=translated.user_language,
+    profile_document = await farm_profile_repository.create(profile_document)
+    return FarmProfile.model_validate(
+        {
+            **translated.user_language.model_dump(mode="json"),
+            "id": profile_document.id,
+            "user_id": user_id,
+            "created_at": profile_document.created_at,
+            "updated_at": profile_document.updated_at,
+        }
     )
 
 
@@ -106,17 +97,21 @@ async def update_farm_profile(
         fields=fields,
         source_language=PersistenceLanguage.USER_LANGUAGE,
     )
-    persistence_profile = PersistenceFarmProfile(
+    profile_document = FarmProfileDocument(
         id=farm_id,
         user_id=user_id,
         english=translated.english,
         user_language=translated.user_language,
     )
-    await farm_profile_repository.save(persistence_profile)
-    return _farm_profile(
-        profile_id=farm_id,
-        user_id=user_id,
-        fields=translated.user_language,
+    profile_document = await farm_profile_repository.save(profile_document)
+    return FarmProfile.model_validate(
+        {
+            **translated.user_language.model_dump(mode="json"),
+            "id": farm_id,
+            "user_id": user_id,
+            "created_at": profile_document.created_at,
+            "updated_at": profile_document.updated_at,
+        }
     )
 
 
@@ -150,16 +145,20 @@ async def _create_farm_profile(
         fields=fields,
         source_language=PersistenceLanguage.ENGLISH,
     )
-    persistence_profile = PersistenceFarmProfile(
+    profile_document = FarmProfileDocument(
         user_id=user_id,
         english=translated.english,
         user_language=translated.user_language,
     )
-    await farm_profile_repository.create(persistence_profile)
-    return _farm_profile(
-        profile_id=persistence_profile.id,
-        user_id=user_id,
-        fields=translated.english,
+    profile_document = await farm_profile_repository.create(profile_document)
+    return FarmProfile.model_validate(
+        {
+            **translated.english.model_dump(mode="json"),
+            "id": profile_document.id,
+            "user_id": user_id,
+            "created_at": profile_document.created_at,
+            "updated_at": profile_document.updated_at,
+        }
     )
 
 
@@ -169,16 +168,20 @@ async def _create_translated_farm_profile(
     english: FarmProfileFields,
     user_language: FarmProfileFields,
 ) -> FarmProfile:
-    persistence_profile = PersistenceFarmProfile(
+    profile_document = FarmProfileDocument(
         user_id=user_id,
         english=english,
         user_language=user_language,
     )
-    await farm_profile_repository.create(persistence_profile)
-    return _farm_profile(
-        profile_id=persistence_profile.id,
-        user_id=user_id,
-        fields=user_language,
+    profile_document = await farm_profile_repository.create(profile_document)
+    return FarmProfile.model_validate(
+        {
+            **user_language.model_dump(mode="json"),
+            "id": profile_document.id,
+            "user_id": user_id,
+            "created_at": profile_document.created_at,
+            "updated_at": profile_document.updated_at,
+        }
     )
 
 
@@ -193,17 +196,21 @@ async def _update_farm_profile(
         fields=fields,
         source_language=PersistenceLanguage.ENGLISH,
     )
-    persistence_profile = PersistenceFarmProfile(
+    profile_document = FarmProfileDocument(
         id=farm_id,
         user_id=user_id,
         english=translated.english,
         user_language=translated.user_language,
     )
-    await farm_profile_repository.save(persistence_profile)
-    return _farm_profile(
-        profile_id=farm_id,
-        user_id=user_id,
-        fields=translated.english,
+    profile_document = await farm_profile_repository.save(profile_document)
+    return FarmProfile.model_validate(
+        {
+            **translated.english.model_dump(mode="json"),
+            "id": farm_id,
+            "user_id": user_id,
+            "created_at": profile_document.created_at,
+            "updated_at": profile_document.updated_at,
+        }
     )
 
 
@@ -214,15 +221,19 @@ async def _update_translated_farm_profile(
     english: FarmProfileFields,
     user_language: FarmProfileFields,
 ) -> FarmProfile:
-    persistence_profile = PersistenceFarmProfile(
+    profile_document = FarmProfileDocument(
         id=farm_id,
         user_id=user_id,
         english=english,
         user_language=user_language,
     )
-    await farm_profile_repository.save(persistence_profile)
-    return _farm_profile(
-        profile_id=farm_id,
-        user_id=user_id,
-        fields=user_language,
+    profile_document = await farm_profile_repository.save(profile_document)
+    return FarmProfile.model_validate(
+        {
+            **user_language.model_dump(mode="json"),
+            "id": farm_id,
+            "user_id": user_id,
+            "created_at": profile_document.created_at,
+            "updated_at": profile_document.updated_at,
+        }
     )

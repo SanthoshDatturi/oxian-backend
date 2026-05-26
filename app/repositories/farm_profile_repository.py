@@ -1,5 +1,7 @@
+import time
+
 from app.integrations.database.mogodb import get_farm_profiles_collection
-from app.schemas.farm_profile import FarmProfile, FarmProfileFields, PersistenceFarmProfile
+from app.schemas.farm_profile import FarmProfile, FarmProfileDocument, FarmProfileFields
 from app.schemas.generic_types import PersistenceLanguage
 
 
@@ -8,23 +10,38 @@ def _to_farm_profile(
     language: PersistenceLanguage,
 ) -> FarmProfile:
     fields = document.get(language.value) or {}
-    return FarmProfile.model_validate(
-        {
-            **fields,
-            "id": document["_id"],
-            "user_id": document["user_id"],
-        }
-    )
+    data = {
+        **fields,
+        "id": document["_id"],
+        "user_id": document["user_id"],
+    }
+    if document.get("created_at") is not None:
+        data["created_at"] = document["created_at"]
+    if document.get("updated_at") is not None:
+        data["updated_at"] = document["updated_at"]
+    return FarmProfile.model_validate(data)
 
 
-async def create(profile: PersistenceFarmProfile) -> PersistenceFarmProfile:
+def _touch(profile: FarmProfileDocument) -> FarmProfileDocument:
+    return profile.model_copy(update={"updated_at": time.time()})
+
+
+async def create(profile: FarmProfileDocument) -> FarmProfileDocument:
+    profile = _touch(profile)
     await get_farm_profiles_collection().insert_one(
         profile.model_dump(by_alias=True, exclude_none=True, mode="json")
     )
     return profile
 
 
-async def save(profile: PersistenceFarmProfile) -> PersistenceFarmProfile:
+async def save(profile: FarmProfileDocument) -> FarmProfileDocument:
+    existing = await get_farm_profiles_collection().find_one(
+        {"_id": profile.id},
+        {"created_at": 1},
+    )
+    if existing and existing.get("created_at") is not None:
+        profile = profile.model_copy(update={"created_at": existing["created_at"]})
+    profile = _touch(profile)
     await get_farm_profiles_collection().replace_one(
         {"_id": profile.id},
         profile.model_dump(by_alias=True, exclude_none=True, mode="json"),
@@ -37,12 +54,21 @@ async def save_language(
     profile: FarmProfile,
     language: PersistenceLanguage,
 ) -> FarmProfile:
+    profile = profile.model_copy(update={"updated_at": time.time()})
     fields = FarmProfileFields.model_validate(profile).model_dump(
         exclude_none=True, mode="json"
     )
     await get_farm_profiles_collection().update_one(
         {"_id": profile.id, "user_id": profile.user_id},
-        {"$set": {"user_id": profile.user_id, language.value: fields}},
+        {
+            "$set": {
+                "user_id": profile.user_id,
+                "updated_at": profile.updated_at,
+                language.value: fields,
+            },
+            "$setOnInsert": {"created_at": profile.created_at},
+        },
+        upsert=True,
     )
     return profile
 
@@ -55,7 +81,13 @@ async def get_by_id(
     query: dict[str, str] = {"_id": farm_id}
     if user_id:
         query["user_id"] = user_id
-    projection = {"_id": 1, "user_id": 1, language.value: 1}
+    projection = {
+        "_id": 1,
+        "user_id": 1,
+        "created_at": 1,
+        "updated_at": 1,
+        language.value: 1,
+    }
     document = await get_farm_profiles_collection().find_one(query, projection)
     if not document:
         return None
@@ -67,7 +99,13 @@ async def list_by_user(
     language: PersistenceLanguage,
     limit: int = 100,
 ) -> list[FarmProfile]:
-    projection = {"_id": 1, "user_id": 1, language.value: 1}
+    projection = {
+        "_id": 1,
+        "user_id": 1,
+        "created_at": 1,
+        "updated_at": 1,
+        language.value: 1,
+    }
     cursor = (
         get_farm_profiles_collection()
         .find({"user_id": user_id}, projection)
