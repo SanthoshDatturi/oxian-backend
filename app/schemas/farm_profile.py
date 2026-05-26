@@ -4,7 +4,7 @@ from uuid import uuid4
 from langchain_core.runnables.configurable import StrEnum
 from pydantic import AliasChoices, BaseModel, Field
 
-from .generic_types import LatLang
+from .generic_types import LatLng
 
 
 class SoilTexturePercentage(BaseModel):
@@ -193,7 +193,7 @@ class CropSeason(StrEnum):
 class Location(BaseModel):
     """Represents the geographical location of the farm."""
 
-    lat_lang: LatLang = Field(
+    lat_lng: LatLng = Field(
         description="Represents the Geographic co-ordinates of the farm"
     )
 

@@ -3,7 +3,7 @@ from enum import StrEnum
 from pydantic import BaseModel, Field
 
 
-class LatLang(BaseModel):
+class LatLng(BaseModel):
     latitude: float = Field(
         description="The latitude in degrees. It must be in the range [-90.0, +90.0].",
     )

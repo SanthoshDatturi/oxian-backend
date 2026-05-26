@@ -6,7 +6,7 @@ from uuid import uuid4
 from pydantic import AliasChoices, BaseModel, Field
 
 from app.schemas.chat import ChatMode
-from app.schemas.generic_types import LatLang
+from app.schemas.generic_types import LatLng
 
 
 class Role(StrEnum):
@@ -41,7 +41,7 @@ class FilePart(BaseModel):
 
 class LocationPart(BaseModel):
     type: Literal[PartType.LOCATION] = PartType.LOCATION
-    location: LatLang
+    location: LatLng
     label: str | None = None
 
 
