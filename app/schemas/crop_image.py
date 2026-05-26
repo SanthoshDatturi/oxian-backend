@@ -7,19 +7,22 @@ from pydantic import AliasChoices, BaseModel, Field, field_validator
 from app.core.config import settings
 
 
-class CropImageFile(BaseModel):
+class BaseCropImageFields(BaseModel):
+    crop_name: str = Field(
+        description="Name of the crop associated with the image. Example: Rice"
+    )
+    aliases: Optional[List[str]] = Field(
+        default=None, description="List of alternative names for the crop."
+    )
+
+
+class CropImageFile(BaseCropImageFields):
     id: str = Field(
         default_factory=lambda: uuid4().hex,
         validation_alias=AliasChoices("id", "_id"),
         serialization_alias="_id",
     )
-    crop_name: str = Field(
-        description="Name of the crop associated with the image. Example: Rice"
-    )
     embedding: List[float]
-    aliases: Optional[List[str]] = Field(
-        default=None, description="List of alternative names for the crop."
-    )
     created_at: float = Field(default_factory=time.time)
 
     @field_validator("embedding")
@@ -30,16 +33,10 @@ class CropImageFile(BaseModel):
         return v
 
 
-class RetrievedCropImageFile(BaseModel):
+class RetrievedCropImageFile(BaseCropImageFields):
     id: str = Field(
         validation_alias=AliasChoices("id", "_id"),
         serialization_alias="_id",
-    )
-    crop_name: str = Field(
-        description="Name of the crop associated with the image. Example: Rice"
-    )
-    aliases: Optional[List[str]] = Field(
-        default=None, description="List of alternative names for the crop."
     )
 
 
