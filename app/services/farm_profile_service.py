@@ -135,54 +135,19 @@ async def _get_farm_profile(farm_id: str, user_id: str) -> FarmProfile | None:
     )
 
 
-async def _create_farm_profile(
-    *,
-    user_id: str,
-    fields: FarmProfileFields,
-) -> FarmProfile:
-    translated = await _translate_farm_profile(
-        user_id=user_id,
-        fields=fields,
-        source_language=PersistenceLanguage.ENGLISH,
-    )
-    profile_document = FarmProfileDocument(
-        user_id=user_id,
-        english=translated.english,
-        user_language=translated.user_language,
-    )
-    profile_document = await farm_profile_repository.create(profile_document)
-    return FarmProfile.model_validate(
-        {
-            **translated.english.model_dump(mode="json"),
-            "id": profile_document.id,
-            "user_id": user_id,
-            "created_at": profile_document.created_at,
-            "updated_at": profile_document.updated_at,
-        }
-    )
-
-
 async def _create_translated_farm_profile(
     *,
     user_id: str,
     english: FarmProfileFields,
     user_language: FarmProfileFields,
-) -> FarmProfile:
+) -> FarmProfileDocument:
     profile_document = FarmProfileDocument(
         user_id=user_id,
         english=english,
         user_language=user_language,
     )
     profile_document = await farm_profile_repository.create(profile_document)
-    return FarmProfile.model_validate(
-        {
-            **user_language.model_dump(mode="json"),
-            "id": profile_document.id,
-            "user_id": user_id,
-            "created_at": profile_document.created_at,
-            "updated_at": profile_document.updated_at,
-        }
-    )
+    return profile_document
 
 
 async def _update_farm_profile(
@@ -220,7 +185,7 @@ async def _update_translated_farm_profile(
     user_id: str,
     english: FarmProfileFields,
     user_language: FarmProfileFields,
-) -> FarmProfile:
+) -> FarmProfileDocument:
     profile_document = FarmProfileDocument(
         id=farm_id,
         user_id=user_id,
@@ -228,12 +193,4 @@ async def _update_translated_farm_profile(
         user_language=user_language,
     )
     profile_document = await farm_profile_repository.save(profile_document)
-    return FarmProfile.model_validate(
-        {
-            **user_language.model_dump(mode="json"),
-            "id": farm_id,
-            "user_id": user_id,
-            "created_at": profile_document.created_at,
-            "updated_at": profile_document.updated_at,
-        }
-    )
+    return profile_document

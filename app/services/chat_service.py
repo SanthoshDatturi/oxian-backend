@@ -423,9 +423,9 @@ async def _run_turn(
 
             saved_farm_profile_part = FarmProfileReferencePart(
                 farm_id=saved.id,
-                name=saved.name,
+                name=saved.user_language.name,
             )
-            return {"farm_id": saved.id, "name": saved.name}
+            return {"farm_id": saved.id, "name": saved.user_language.name}
 
         @tool
         async def get_current_weather(lat: float, lon: float) -> dict[str, Any]:
