@@ -7,11 +7,15 @@ from app.core.config import settings
 from app.integrations.storage import files
 from app.integrations.storage.base import StorageScope
 from app.integrations.storage.errors import StorageError
-from app.repositories import crop_image_repository
+from app.repositories import (
+    crop_image_generate_request_repository,
+    crop_image_repository,
+)
 from app.schemas.crop_image import (
     CropImageFile,
     HybridCropImageSearchResult,
 )
+from app.schemas.crop_image_generate_request import CropImageGenerateRequest
 
 
 def _normalize_aliases(aliases: list[str] | None) -> list[str] | None:
@@ -112,3 +116,36 @@ async def crops_image_search(
     return await asyncio.gather(
         *(_search_crop_image(crop_name) for crop_name in crop_names)
     )
+
+
+async def generate_new_crop_image(
+    crop_name: str, aliases: list[str] | None
+) -> str | None:
+    """
+    For now, just the image request only created and not acutal image
+    It should be implemented using image generation model
+    Dev Team manually looks up any new generation requests, generates image
+    and uploads them with image_file_id in blob store and deletes request
+    """
+    normalized_crop_name = crop_name.strip()
+    if not normalized_crop_name:
+        return None
+
+    normalized_aliases = _normalize_aliases(aliases=aliases)
+
+    embeddings = await _generate_embedding(
+        crop_name=crop_name, aliases=normalized_aliases
+    )
+
+    crop_image_file = CropImageFile(
+        crop_name=crop_name, aliases=normalized_aliases, embedding=embeddings
+    )
+    crop_image_file = await crop_image_repository.create(crop_image_file)
+
+    await crop_image_generate_request_repository.create(
+        CropImageGenerateRequest(
+            image_file_id=crop_image_file.id, crop_name=crop_name, aliases=aliases
+        )
+    )
+
+    return crop_image_file.id

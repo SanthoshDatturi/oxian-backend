@@ -126,3 +126,7 @@ def get_farm_profiles_collection() -> AsyncIOMotorCollection:
 
 def get_user_prefs_collection() -> AsyncIOMotorCollection:
     return _get_collection("user_prefs")
+
+
+def get_crop_image_generate_requests_collection() -> AsyncIOMotorCollection:
+    return _get_collection("crop_image_generate_requests")
