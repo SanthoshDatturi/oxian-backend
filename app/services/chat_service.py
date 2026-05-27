@@ -14,11 +14,11 @@ from langchain_core.tools import tool
 from langchain_google_genai import ChatGoogleGenerativeAI
 from pydantic import ValidationError
 
+from app.common_tools.weather import WEATHER_TOOLS
 from app.core.config import settings
 from app.core.process_manager import process_manager
 from app.core.simple_queue import enqueue
 from app.integrations.storage.base import StorageEntity
-from app.integrations.weather import open_weather
 from app.prompts.prompt_manager import PromptManager
 from app.repositories import (
     chat_repository,
@@ -427,54 +427,16 @@ async def _run_turn(
             )
             return {"farm_id": saved.id, "name": saved.user_language.name}
 
-        @tool
-        async def get_current_weather(lat: float, lon: float) -> dict[str, Any]:
-            """Get current weather for latitude and longitude."""
-            data = await open_weather.get_current_weather(lat=lat, lon=lon)
-            return (
-                {"available": False} if data is None else data.model_dump(mode="json")
-            )
-
-        @tool
-        async def get_5_day_3_hour_forecast(lat: float, lon: float) -> dict[str, Any]:
-            """Get 5 day forecast in 3 hour steps for latitude and longitude."""
-            data = await open_weather.get_5_day_3_hour_forecast(lat=lat, lon=lon)
-            return (
-                {"available": False} if data is None else data.model_dump(mode="json")
-            )
-
-        @tool
-        async def get_air_pollution(lat: float, lon: float) -> dict[str, Any]:
-            """Get air pollution metrics for latitude and longitude."""
-            data = await open_weather.get_air_pollution(lat=lat, lon=lon)
-            return (
-                {"available": False} if data is None else data.model_dump(mode="json")
-            )
-
-        @tool
-        async def get_reverse_geocoding(lat: float, lon: float) -> dict[str, Any]:
-            """Get reverse geocoding details for latitude and longitude."""
-            data = await open_weather.get_reverse_geocoding(lat=lat, lon=lon)
-            if data is None:
-                return {"available": False}
-            return {
-                "available": True,
-                "results": [item.model_dump(mode="json") for item in data],
-            }
-
+        tools = list(WEATHER_TOOLS)
+        if chat.mode == ChatMode.FARM_SURVEY:
+            tools.append(save_farm_profile)
         agent = create_agent(
             model=ChatGoogleGenerativeAI(
                 model=settings.GEMINI_CHAT_MODEL,
                 streaming=True,
                 temperature=0.3,
             ),
-            tools=[
-                save_farm_profile,
-                get_current_weather,
-                get_5_day_3_hour_forecast,
-                get_air_pollution,
-                get_reverse_geocoding,
-            ],
+            tools=tools,
             system_prompt=system_prompt,
         )
 
