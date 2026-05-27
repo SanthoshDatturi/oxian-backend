@@ -10,6 +10,242 @@ from .farm_profile import CropYield
 from .generic_types import Level, MoneyValue, TranslatedFields
 
 
+class RecommendationGoal(StrEnum):
+    """Represents the farmer's primary objective for crop recommendation."""
+
+    MAXIMUM_PROFIT = "maximum_profit"
+    LOW_INVESTMENT = "low_investment"
+    LOW_RISK = "low_risk"
+    SHORT_DURATION = "short_duration"
+    LOW_WATER_USAGE = "low_water_usage"
+    SOIL_IMPROVEMENT = "soil_improvement"
+    ORGANIC_FARMING = "organic_farming"
+    FODDER_PRODUCTION = "fodder_production"
+    EXPORT_MARKET = "export_market"
+    LOCAL_MARKET = "local_market"
+    INTERCROPPING = "intercropping"
+    HIGH_MARKET_DEMAND = "high_market_demand"
+    SUSTAINABLE_FARMING = "sustainable_farming"
+
+
+class RiskTolerance(StrEnum):
+    """Represents how much cultivation or market risk the farmer is willing to accept."""
+
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
+
+
+class WaterAvailabilityPreference(StrEnum):
+    """Represents water availability constraints or preferences."""
+
+    LOW_WATER_ONLY = "low_water_only"
+    MODERATE_WATER_USAGE = "moderate_water_usage"
+    HIGH_WATER_USAGE_ALLOWED = "high_water_usage_allowed"
+    RAINFED_ONLY = "rainfed_only"
+    IRRIGATION_AVAILABLE = "irrigation_available"
+
+
+class CropDurationPreference(StrEnum):
+    """Represents preferred crop duration."""
+
+    SHORT = "short"
+    MEDIUM = "medium"
+    LONG = "long"
+    ANY = "any"
+
+
+class FarmingMethodPreference(StrEnum):
+    """Represents preferred farming practice."""
+
+    ORGANIC = "organic"
+    CONVENTIONAL = "conventional"
+    LOW_CHEMICAL_INPUT = "low_chemical_input"
+    NATURAL_FARMING = "natural_farming"
+    ANY = "any"
+
+
+class RecommendationType(StrEnum):
+    """Represents the type of crop recommendation requested."""
+
+    MONO_CROP = "mono_crop"
+    INTERCROP = "intercrop"
+    BOTH = "both"
+
+
+class ProfitabilityPreference(StrEnum):
+    """Represents profitability filtering preference."""
+
+    ALL = "all"
+    ONLY_HIGHLY_PROFITABLE = "only_highly_profitable"
+    BALANCED_PROFITABILITY = "balanced_profitability"
+
+
+class RecommendationCountPreference(BaseModel):
+    """
+    Represents how many recommendation candidates the farmer wants to receive.
+    """
+
+    mono_crop_count: int = Field(
+        ge=0,
+        le=5,
+        default=3,
+        description=(
+            "Number of mono-crop recommendation candidates requested. Example: 3"
+        ),
+    )
+
+    intercrop_count: int = Field(
+        ge=0,
+        le=5,
+        default=2,
+        description=(
+            "Number of intercropping recommendation candidates requested. Example: 2"
+        ),
+    )
+
+    top_profitable_crop_count: Optional[int] = Field(
+        default=None,
+        ge=1,
+        le=5,
+        description=(
+            "Number of top highly profitable crop recommendations requested. Example: 3"
+        ),
+    )
+
+
+class BudgetPreference(BaseModel):
+    """Represents cultivation budget constraints provided by the farmer."""
+
+    maximum_budget: Optional[MoneyValue] = Field(
+        default=None,
+        description=(
+            "Maximum investment budget the farmer is willing to spend for cultivation."
+        ),
+    )
+
+    budget_per_area: Optional[MoneyValue] = Field(
+        default=None,
+        description=("Maximum investment budget allowed per cultivation area unit."),
+    )
+
+
+class ResourceConstraint(BaseModel):
+    """Represents practical farm resource constraints."""
+
+    limited_labor: bool = Field(
+        default=False, description="Indicates whether labor availability is limited."
+    )
+
+    limited_machinery: bool = Field(
+        default=False,
+        description="Indicates whether machinery or farm equipment availability is limited.",
+    )
+
+    limited_water_supply: bool = Field(
+        default=False,
+        description="Indicates whether irrigation water availability is limited.",
+    )
+
+    limited_input_availability: bool = Field(
+        default=False,
+        description="Indicates whether fertilizers, pesticides, or seeds are difficult to obtain.",
+    )
+
+    storage_unavailable: bool = Field(
+        default=False,
+        description="Indicates whether post-harvest storage facilities are unavailable.",
+    )
+
+
+class CropRecommendationRequest(BaseModel):
+    """
+    Represents farmer preferences, goals, constraints, and filtering criteria
+    used while generating crop recommendations.
+    """
+
+    recommendation_type: RecommendationType = Field(
+        default=RecommendationType.BOTH,
+        description=("Type of recommendation requested by the farmer."),
+    )
+
+    recommendation_counts: RecommendationCountPreference = Field(
+        default_factory=RecommendationCountPreference,
+        description=(
+            "Controls how many recommendation candidates should be generated."
+        ),
+    )
+
+    primary_goal: RecommendationGoal = Field(
+        description=(
+            "Primary objective the farmer wants to achieve through cultivation."
+        ),
+    )
+
+    secondary_goals: Optional[List[RecommendationGoal]] = Field(
+        default=None,
+        description=(
+            "Additional farming objectives that should influence recommendation ranking."
+        ),
+    )
+
+    profitability_preference: ProfitabilityPreference = Field(
+        default=ProfitabilityPreference.BALANCED_PROFITABILITY,
+        description=(
+            "Controls whether recommendations should prioritize highly profitable crops or balanced recommendations."
+        ),
+    )
+
+    risk_tolerance: RiskTolerance = Field(
+        default=RiskTolerance.MEDIUM,
+        description=(
+            "Indicates how much cultivation or market risk the farmer is willing to accept."
+        ),
+    )
+
+    water_availability_preference: Optional[WaterAvailabilityPreference] = Field(
+        default=None,
+        description=("Water availability preference or irrigation constraint."),
+    )
+
+    crop_duration_preference: CropDurationPreference = Field(
+        default=CropDurationPreference.ANY,
+        description=("Preferred crop duration category."),
+    )
+
+    farming_method_preference: FarmingMethodPreference = Field(
+        default=FarmingMethodPreference.ANY,
+        description=("Preferred farming practice or cultivation method."),
+    )
+
+    budget_preference: Optional[BudgetPreference] = Field(
+        default=None,
+        description=(
+            "Cultivation investment budget constraints provided by the farmer."
+        ),
+    )
+
+    excluded_crops: Optional[List[str]] = Field(
+        default=None,
+        description=(
+            "List of crops the farmer does not want to cultivate. Example: ['Cotton']"
+        ),
+    )
+
+    resource_constraints: Optional[ResourceConstraint] = Field(
+        default=None,
+        description=("Practical resource limitations affecting crop selection."),
+    )
+
+    additional_context: Optional[str] = Field(
+        default=None,
+        description=(
+            "Additional farmer instructions, requirements, or local context "
+            "that may influence crop recommendations."
+        ),
+    )
+
+
 class SowingWindow(BaseModel):
     """Represents the recommended sowing period for a crop."""
 
@@ -391,6 +627,10 @@ class CropRecommendation(CropRecommendationFields):
         serialization_alias="_id",
     )
 
+    request: CropRecommendationRequest = Field(
+        description="Original crop recommendation request containing farmer preferences and constraints used for generating this recommendation.",
+    )
+
     farm_id: str = Field(
         description="Identifier of the farm for which recommendations were generated.",
     )
@@ -411,6 +651,10 @@ class CropRecommendationDocument(TranslatedCropRecommendationFields):
         description="Unique identifier for the recommendation result.",
         validation_alias=AliasChoices("id", "_id"),
         serialization_alias="_id",
+    )
+
+    request: CropRecommendationRequest = Field(
+        description="Original crop recommendation request containing farmer preferences and constraints used for generating this recommendation.",
     )
 
     farm_id: str = Field(
