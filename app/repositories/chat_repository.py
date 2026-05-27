@@ -28,6 +28,18 @@ async def save(chat: Chat) -> Chat:
     return chat
 
 
+async def clear_process_id(chat_id: str, user_id: str, process_id: str) -> bool:
+    now = time.time()
+    result = await get_chats_collection().update_one(
+        {"_id": chat_id, "user_id": user_id, "process_id": process_id},
+        {
+            "$unset": {"process_id": ""},
+            "$set": {"updated_at": now},
+        },
+    )
+    return result.modified_count > 0
+
+
 async def get_by_id(chat_id: str, user_id: str | None = None) -> Chat | None:
     query: dict[str, str] = {"_id": chat_id}
     if user_id:

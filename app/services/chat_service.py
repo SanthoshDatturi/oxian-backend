@@ -349,19 +349,19 @@ async def _run_turn(
     model_content: list[dict[str, Any]],
     events: asyncio.Queue[dict[str, Any] | None],
 ) -> None:
-    process_task = asyncio.current_task()
-    if process_task is None:
-        raise RuntimeError("No running task for process execution.")
-    process_manager.register(process.id, process_task)
-
-    process.status = State.RUNNING
-    await process_repository.save(process)
-
     collected_text = ""
     saved_farm_profile_part: FarmProfileReferencePart | None = None
     active_chat = chat
 
     try:
+        process_task = asyncio.current_task()
+        if process_task is None:
+            raise RuntimeError("No running task for process execution.")
+        process_manager.register(process.id, process_task)
+
+        process.status = State.RUNNING
+        await process_repository.save(process)
+
         history = await message_repository.list_latest_by_chat(
             chat_id=chat.id,
             limit=settings.CHAT_HISTORY_LIMIT,
@@ -572,6 +572,18 @@ async def _run_turn(
         )
     finally:
         process_manager.remove(process.id)
+        try:
+            await chat_repository.clear_process_id(
+                chat_id=active_chat.id,
+                user_id=active_chat.user_id,
+                process_id=process.id,
+            )
+        except Exception:
+            logger.exception(
+                "Failed to clear chat process_id process_id=%s chat_id=%s",
+                process.id,
+                active_chat.id,
+            )
         await events.put(None)
 
 
@@ -713,6 +725,22 @@ async def stop_chat_turn(*, user_id: str, chat_id: str) -> bool:
     if not chat.process_id:
         return False
 
+    process = await process_repository.get_by_id(chat.process_id)
+    if process is None:
+        await chat_repository.clear_process_id(
+            chat_id=chat.id,
+            user_id=chat.user_id,
+            process_id=chat.process_id,
+        )
+        return False
+    if process.status not in {State.PENDING, State.RUNNING}:
+        await chat_repository.clear_process_id(
+            chat_id=chat.id,
+            user_id=chat.user_id,
+            process_id=chat.process_id,
+        )
+        return False
+
     cancelled = process_manager.cancel(chat.process_id)
     if not cancelled:
         return False
@@ -722,6 +750,18 @@ async def stop_chat_turn(*, user_id: str, chat_id: str) -> bool:
     except Exception:
         logger.exception(
             "Failed to delete process after stop request process_id=%s chat_id=%s",
+            chat.process_id,
+            chat_id,
+        )
+    try:
+        await chat_repository.clear_process_id(
+            chat_id=chat.id,
+            user_id=chat.user_id,
+            process_id=chat.process_id,
+        )
+    except Exception:
+        logger.exception(
+            "Failed to clear chat process_id after stop request process_id=%s chat_id=%s",
             chat.process_id,
             chat_id,
         )
