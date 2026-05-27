@@ -233,7 +233,7 @@ class Location(BaseModel):
 
 
 class PreviousCrops(BaseModel):
-    """Represents crops previously cultivated on the farm."""
+    """Represents crops previously cultivated on the farm, which are not recommended and tracked oxian."""
 
     crop_name: str = Field(description="Name of the crop grown. Example: Rice")
 
@@ -258,6 +258,55 @@ class PreviousCrops(BaseModel):
     inputs_used: List[AgriculturalInput] = Field(
         default_factory=list,
         description="Structured list of agricultural inputs applied for the crop, if farmer remembers.",
+    )
+
+    note: str = Field(
+        description=(
+            "Farmer-provided observation, experience, issue, or success related to the crop. "
+            "Example: Cotton failed last year due to severe pest attack."
+        )
+    )
+
+
+class FarmAssetCategory(StrEnum):
+    """Represents categories of farm infrastructure, facilities, and equipment."""
+
+    IRRIGATION = "irrigation"
+    MACHINERY = "machinery"
+    STORAGE = "storage"
+    PROTECTED_CULTIVATION = "protected_cultivation"
+    ENERGY = "energy"
+    LIVESTOCK = "livestock"
+    PROCESSING = "processing"
+    TRANSPORT = "transport"
+    OTHER = "other"
+
+
+class FarmAsset(BaseModel):
+    """
+    Represents farm infrastructure, equipment, facilities,
+    or operational setups available on the farm.
+    """
+
+    category: FarmAssetCategory = Field(
+        description="Category of the farm asset or facility."
+    )
+
+    name: str = Field(
+        description=(
+            "Name of the asset, equipment, or setup. Example: Drip Irrigation System"
+        )
+    )
+
+    quantity: Optional[int] = Field(
+        default=None, ge=1, description="Number of such assets available on the farm."
+    )
+
+    description: Optional[str] = Field(
+        default=None,
+        description=(
+            "Additional details about the asset, setup, or operational condition."
+        ),
     )
 
 
@@ -302,6 +351,14 @@ class FarmProfileFields(BaseModel):
         description=(
             "Detailed soil test results including nutrient levels and soil characteristics."
             "Should upload images or PDF documents of the test, extract from them."
+        ),
+    )
+
+    farm_assets: Optional[List[FarmAsset]] = Field(
+        default=None,
+        description=(
+            "List of farm infrastructure, machinery, facilities, "
+            "and operational setups available on the farm."
         ),
     )
 
