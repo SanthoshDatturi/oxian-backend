@@ -130,3 +130,7 @@ def get_user_prefs_collection() -> AsyncIOMotorCollection:
 
 def get_crop_image_generate_requests_collection() -> AsyncIOMotorCollection:
     return _get_collection("crop_image_generate_requests")
+
+
+def get_crop_recommendations_collection() -> AsyncIOMotorCollection:
+    return _get_collection("crop_recommendations")
