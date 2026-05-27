@@ -5,7 +5,7 @@ from uuid import uuid4
 from langchain_core.runnables.configurable import StrEnum
 from pydantic import AliasChoices, BaseModel, Field, model_validator
 
-from .generic_types import Area, AreaUnit, LatLng, Quantity
+from .generic_types import Area, AreaUnit, LatLng, Quantity, TranslatedFields
 
 
 class SoilTexturePercentage(BaseModel):
@@ -317,21 +317,7 @@ class FarmProfileFields(BaseModel):
         return self
 
 
-# Backend only Model
-class TranslatedFarmProfileFields(BaseModel):
-    english: FarmProfileFields = Field(
-        description=(
-            "Farm profile fields with descriptions and values in formal and proper English language, used for analysis and reasoning. "
-            "Units should be same as provided by the user in both languages."
-        )
-    )
-
-    user_language: FarmProfileFields = Field(
-        description=(
-            "Farm profile fields with descriptions and values in the farmer's preferred language for better understanding for user. "
-            "Units should be same as provided by the user in both languages."
-        )
-    )
+TranslatedFarmProfileFields = TranslatedFields[FarmProfileFields]
 
 
 class FarmProfile(FarmProfileFields):

@@ -401,8 +401,11 @@ class CropRecommendation(CropRecommendationFields):
     )
 
 
+TranslatedCropRecommendationFields = TranslatedFields[CropRecommendationFields]
+
+
 # Backend only Model
-class CropRecommendationDocument(TranslatedFields[CropRecommendationFields]):
+class CropRecommendationDocument(TranslatedCropRecommendationFields):
     id: str = Field(
         default_factory=lambda: uuid4().hex,
         description="Unique identifier for the recommendation result.",

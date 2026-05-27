@@ -38,8 +38,7 @@ async def _translate_farm_profile(
         temperature=0,
     ).with_structured_output(TranslatedFarmProfileFields)
     response = await model.ainvoke(prompt)
-    if isinstance(response, TranslatedFarmProfileFields):
-        return response
+
     return TranslatedFarmProfileFields.model_validate(response)
 
 
