@@ -1,6 +1,40 @@
 from enum import StrEnum
+from typing import Generic, TypeVar
 
 from pydantic import BaseModel, Field
+
+
+# Backend only type
+class PersistenceLanguage(StrEnum):
+    ENGLISH = "english"
+    USER_LANGUAGE = "user_language"
+
+
+T = TypeVar("T", bound=BaseModel)
+
+
+# Backend only type
+class TranslatedFields(BaseModel, Generic[T]):
+    """
+    Generic multilingual wrapper for any model.
+
+    Stores:
+    - canonical English version for reasoning and analysis
+    - user language version for farmer-facing UI
+    """
+
+    english: T = Field(
+        description=(
+            "Canonical English version of the data, used for reasoning and analysis."
+            "Units should be same as provided by the user in both languages."
+        )
+    )
+    user_language: T = Field(
+        description=(
+            "User language version of the data, used for farmer-facing UI."
+            "Units should be same as provided by the user in both languages."
+        )
+    )
 
 
 class LatLng(BaseModel):
@@ -10,12 +44,6 @@ class LatLng(BaseModel):
     longitude: float = Field(
         description="The longitude in degrees. It must be in the range [-180.0, +180.0].",
     )
-
-
-# Backend only type
-class PersistenceLanguage(StrEnum):
-    ENGLISH = "english"
-    USER_LANGUAGE = "user_language"
 
 
 class Currency(StrEnum):
