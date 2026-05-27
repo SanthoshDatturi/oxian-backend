@@ -5,7 +5,7 @@ from uuid import uuid4
 from langchain_core.runnables.configurable import StrEnum
 from pydantic import AliasChoices, BaseModel, Field, model_validator
 
-from .generic_types import LatLng
+from .generic_types import Area, AreaUnit, LatLng, Quantity
 
 
 class SoilTexturePercentage(BaseModel):
@@ -97,36 +97,6 @@ class SoilTestProperties(BaseModel):
     )
 
 
-class AreaUnit(StrEnum):
-    """Supported land area units."""
-
-    ACRE = "acre"
-    HECTARE = "hectare"
-    SQUARE_METER = "square_meter"
-
-
-class QuantityUnit(StrEnum):
-    """Supported quantity units."""
-
-    KG = "kg"
-    TONNE = "tonne"
-    QUINTAL = "quintal"
-    BUSHEL = "bushel"
-
-
-class Area(BaseModel):
-    """Represents a land area measurement."""
-
-    value: float = Field(
-        gt=0,
-        description="Numeric value representing the size of the land area. Example: 5",
-    )
-
-    unit: AreaUnit = Field(
-        description="Unit used to measure the land area. Example: acre"
-    )
-
-
 def _area_to_square_meters(area: Area) -> float:
     conversion_factor = {
         AreaUnit.ACRE: 4046.8564224,
@@ -140,20 +110,12 @@ def _area_to_square_meters(area: Area) -> float:
 class CropYield(BaseModel):
     """Represents crop yield as quantity produced over a specific land area."""
 
-    quantity: float = Field(
-        gt=0, description="Total crop quantity harvested. Example: 20"
+    quantity: Quantity = Field(
+        gt=0, description="Total crop quantity harvested. Example: 20 quintal."
     )
 
-    quantity_unit: QuantityUnit = Field(
-        description="Unit used to measure harvested crop quantity. Example: quintal"
-    )
-
-    area: float = Field(
-        gt=0, description="Area over which the yield was measured. Example: 1"
-    )
-
-    area_unit: AreaUnit = Field(
-        description="Unit of land area used for yield measurement. Example: acre. Together represents values like 20 quintal per acre."
+    area: Area = Field(
+        description="Area over which the yield was measured. Example: 1 acre."
     )
 
 
@@ -229,25 +191,10 @@ class AgriculturalInput(BaseModel):
         description="Commercial or generic name of the agricultural input. Example: Urea"
     )
 
-    quantity: Optional[float] = Field(
+    quantity: Optional[Quantity] = Field(
         default=None,
-        ge=0,
-        description="Quantity applied. Example: 50",
+        description="Quantity applied. Example: 50 kg",
     )
-
-    unit: Optional[QuantityUnit] = Field(
-        default=None,
-        description="Unit of measurement for the applied quantity. Example: kg",
-    )
-
-    @model_validator(mode="after")
-    def validate_quantity_and_unit_pair(self):
-        if (self.quantity is None) != (self.unit is None):
-            raise ValueError(
-                "Both quantity and unit must either be provided together or omitted together."
-            )
-
-        return self
 
 
 class Location(BaseModel):
@@ -314,6 +261,7 @@ class PreviousCrops(BaseModel):
     )
 
 
+# Should be directly in FarmProfile in front-end definition
 class FarmProfileFields(BaseModel):
     """Represents the core fields of a farm profile excluding metadata."""
 
@@ -369,6 +317,7 @@ class FarmProfileFields(BaseModel):
         return self
 
 
+# Backend only Model
 class TranslatedFarmProfileFields(BaseModel):
     english: FarmProfileFields = Field(
         description=(
@@ -406,6 +355,7 @@ class FarmProfile(FarmProfileFields):
     updated_at: float = Field(default_factory=time.time)
 
 
+# Backend only Model
 class FarmProfileDocument(TranslatedFarmProfileFields):
     """
     Represents the farm profile data structure used for persistence in the database.
