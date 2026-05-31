@@ -6,6 +6,7 @@ from fastapi import FastAPI
 
 from app.api.rest.admin_api import router as admin_router
 from app.api.rest.chat_api import router as chat_router
+from app.api.rest.crop_recommendation_api import router as crop_recommendation_router
 from app.api.rest.farm_profile_api import router as farm_profile_router
 from app.api.rest.files_api import router as files_router
 from app.api.rest.user_pref_api import router as user_pref_router
@@ -60,3 +61,4 @@ app.include_router(farm_profile_router)
 app.include_router(user_pref_router)
 app.include_router(weather_router)
 app.include_router(admin_router)
+app.include_router(crop_recommendation_router)
