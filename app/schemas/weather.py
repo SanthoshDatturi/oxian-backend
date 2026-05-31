@@ -155,11 +155,7 @@ class ForecastResponse(BaseModel):
 class AirQualityIndex(BaseModel):
     """Air Quality Index (AQI)."""
 
-    main: dict = Field(description="{'aqi': 1|2|3|4|5}")
-
-    @property
-    def aqi(self) -> int:
-        return self.main.get("aqi", 0)
+    aqi: int = Field(description="Air Quality Index: 1=Good, 2=Fair, 3=Moderate, 4=Poor, 5=Very Poor")
 
 
 class PollutantConcentration(BaseModel):

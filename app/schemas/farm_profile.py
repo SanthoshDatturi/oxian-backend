@@ -111,7 +111,7 @@ class CropYield(BaseModel):
     """Represents crop yield as quantity produced over a specific land area."""
 
     quantity: Quantity = Field(
-        gt=0, description="Total crop quantity harvested. Example: 20 quintal."
+        description="Total crop quantity harvested. Example: 20 quintal."
     )
 
     area: Area = Field(
