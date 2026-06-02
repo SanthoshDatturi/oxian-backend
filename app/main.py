@@ -9,11 +9,12 @@ from app.api.rest.chat_api import router as chat_router
 from app.api.rest.crop_recommendation_api import router as crop_recommendation_router
 from app.api.rest.farm_profile_api import router as farm_profile_router
 from app.api.rest.files_api import router as files_router
+from app.api.rest.notification_api import router as notification_router
 from app.api.rest.user_pref_api import router as user_pref_router
 from app.api.rest.weather_api import router as weather_router
 from app.core.simple_queue import worker
 from app.integrations.database.mogodb import close_mongo_client, init_mongo_client
-from app.repositories import crop_image_repository, files_repository
+from app.repositories import crop_image_repository, files_repository, notification_repository
 from app.services import storage_service
 
 logger = logging.getLogger(__name__)
@@ -35,6 +36,7 @@ async def lifespan(app: FastAPI):
     await init_mongo_client()
     await files_repository.ensure_indexes()
     await crop_image_repository.ensure_indexes()
+    await notification_repository.ensure_indexes()
     worker_task = asyncio.create_task(worker())
     cleanup_task = asyncio.create_task(_cleanup_temporary_files_loop())
 
@@ -62,3 +64,4 @@ app.include_router(user_pref_router)
 app.include_router(weather_router)
 app.include_router(admin_router)
 app.include_router(crop_recommendation_router)
+app.include_router(notification_router)

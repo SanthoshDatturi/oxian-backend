@@ -3,7 +3,7 @@ import sys
 
 from firebase_admin import auth
 
-from app.integrations.auth.firebase_config import FirebaseAuthError, initialize_firebase
+from app.integrations.firebase_config import initialize_firebase
 
 
 def make_admin(email: str) -> None:
@@ -24,7 +24,7 @@ def main() -> int:
 
     try:
         make_admin(args.email)
-    except FirebaseAuthError as exc:
+    except ValueError as exc:
         print(f"Firebase configuration error: {exc}", file=sys.stderr)
         return 2
     except auth.UserNotFoundError:

@@ -128,6 +128,14 @@ def get_user_prefs_collection() -> AsyncIOMotorCollection:
     return _get_collection("user_prefs")
 
 
+def get_device_registrations_collection() -> AsyncIOMotorCollection:
+    return _get_collection("device_registrations")
+
+
+def get_notification_records_collection() -> AsyncIOMotorCollection:
+    return _get_collection("notification_records")
+
+
 def get_crop_image_generate_requests_collection() -> AsyncIOMotorCollection:
     return _get_collection("crop_image_generate_requests")
 

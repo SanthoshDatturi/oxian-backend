@@ -3,22 +3,9 @@ from functools import lru_cache
 from typing import Optional
 
 import firebase_admin
-from fastapi.concurrency import run_in_threadpool
-from firebase_admin import auth, credentials
-from firebase_admin import exceptions as firebase_exceptions
+from firebase_admin import credentials
 
 from app.core.config import settings
-
-from .errors import (
-    AuthProviderError,
-    ExpiredTokenError,
-    InvalidTokenError,
-    RevokedTokenError,
-)
-
-
-class FirebaseAuthError(Exception):
-    """Raised when something goes wrong while talking to Firebase Auth."""
 
 
 def _looks_like_private_key(value: str) -> bool:
@@ -33,7 +20,7 @@ def _service_account_from_split_env(private_key: str) -> dict:
     client_email = settings.FIREBASE_CLIENT_EMAIL
 
     if not settings.FIREBASE_PROJECT_ID or not client_email:
-        raise FirebaseAuthError(
+        raise ValueError(
             "FIREBASE_SERVICE_ACCOUNT_JSON contains a private key, not JSON. "
             "Set FIREBASE_PROJECT_ID and FIREBASE_CLIENT_EMAIL, or replace "
             "FIREBASE_SERVICE_ACCOUNT_JSON with the full service account JSON."
@@ -58,7 +45,7 @@ def _certificate_from_payload(payload: dict):
     try:
         return credentials.Certificate(payload)
     except ValueError as exc:
-        raise FirebaseAuthError(
+        raise ValueError(
             "Firebase service account private key is not a valid PEM value. "
             "Check FIREBASE_SERVICE_ACCOUNT_JSON formatting."
         ) from exc
@@ -84,7 +71,7 @@ def _get_credentials():
         try:
             payload = json.loads(raw_service_account)
         except json.JSONDecodeError as exc:
-            raise FirebaseAuthError(
+            raise ValueError(
                 "FIREBASE_SERVICE_ACCOUNT_JSON must be a full service account "
                 "JSON object, not a raw private key or another value."
             ) from exc
@@ -121,29 +108,3 @@ def initialize_firebase():
         )
 
     return firebase_admin.get_app()
-
-
-async def verify_id_token(id_token: str) -> dict:
-    try:
-        app = initialize_firebase()
-        decoded = await run_in_threadpool(auth.verify_id_token, id_token, app, True)
-
-        return decoded
-
-    except FirebaseAuthError as exc:
-        raise AuthProviderError("Firebase authentication is not configured") from exc
-
-    except auth.InvalidIdTokenError as exc:
-        raise InvalidTokenError("Invalid authentication token") from exc
-
-    except auth.ExpiredIdTokenError as exc:
-        raise ExpiredTokenError("Authentication token expired") from exc
-
-    except auth.RevokedIdTokenError as exc:
-        raise RevokedTokenError("Authentication token revoked") from exc
-
-    except firebase_exceptions.FirebaseError as exc:
-        raise AuthProviderError("Firebase authentication failure") from exc
-
-    except Exception as exc:
-        raise AuthProviderError("Unexpected authentication failure") from exc

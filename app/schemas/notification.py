@@ -1,14 +1,10 @@
 import json
-from datetime import datetime
+import time
 from enum import StrEnum
 from typing import Any, Dict, List, Optional
-from uuid import UUID
+from uuid import uuid4
 
-from pydantic import BaseModel, Field, HttpUrl
-
-# ============================================================================
-# ENUMS
-# ============================================================================
+from pydantic import AliasChoices, BaseModel, Field, HttpUrl
 
 
 class DevicePlatform(StrEnum):
@@ -53,11 +49,6 @@ class DataType(StrEnum):
     CROP_RECOMMENDATION = "crop_recommendation"
 
 
-# ============================================================================
-# TARGET
-# ============================================================================
-
-
 class NotificationTarget(BaseModel):
     """
     Device tokens are resolved internally
@@ -66,14 +57,9 @@ class NotificationTarget(BaseModel):
 
     type: NotificationTargetType
 
-    user_id: Optional[UUID] = Field(default=None)
+    user_id: Optional[str] = Field(default=None)
 
     topic: Optional[str] = Field(default=None)
-
-
-# ============================================================================
-# CONTENT
-# ============================================================================
 
 
 class NotificationContent(BaseModel):
@@ -88,11 +74,6 @@ class NotificationContent(BaseModel):
     body: str
 
     image: Optional[HttpUrl] = Field(default=None)
-
-
-# ============================================================================
-# DESTINATION
-# ============================================================================
 
 
 class Destination(BaseModel):
@@ -110,11 +91,6 @@ class Destination(BaseModel):
     params: Dict[str, Any] = Field(default_factory=dict)
 
 
-# ============================================================================
-# ACTIONS
-# ============================================================================
-
-
 class NotificationAction(BaseModel):
     """
     Action button displayed inside
@@ -128,11 +104,6 @@ class NotificationAction(BaseModel):
     payload: Dict[str, Any] = Field(default_factory=dict)
 
 
-# ============================================================================
-# BUSINESS DATA
-# ============================================================================
-
-
 class NotificationData(BaseModel):
     """
     Actual business payload delivered
@@ -142,11 +113,6 @@ class NotificationData(BaseModel):
     type: DataType
 
     fields: Dict[str, Any] = Field(default_factory=dict)
-
-
-# ============================================================================
-# ANDROID
-# ============================================================================
 
 
 class AndroidNotification(BaseModel):
@@ -167,11 +133,6 @@ class AndroidConfig(BaseModel):
     collapse_key: Optional[str] = Field(default=None)
 
     notification: Optional[AndroidNotification] = Field(default=None)
-
-
-# ============================================================================
-# IOS / APNS
-# ============================================================================
 
 
 class ApnsSound(BaseModel):
@@ -202,11 +163,6 @@ class ApnsConfig(BaseModel):
     aps: ApnsAps = Field(default_factory=ApnsAps)
 
 
-# ============================================================================
-# MAIN REQUEST
-# ============================================================================
-
-
 class NotificationRequest(BaseModel):
     """
     Canonical notification request used
@@ -227,17 +183,10 @@ class NotificationRequest(BaseModel):
 
     apns: Optional[ApnsConfig] = Field(default=None)
 
-    scheduled_at: Optional[datetime] = Field(default=None)
+    scheduled_at: Optional[float] = Field(default=None)
 
 
-# ============================================================================
-# DEVICE REGISTRATION
-# ============================================================================
-
-
-class DeviceRegistration(BaseModel):
-    user_id: UUID
-
+class DeviceRegistrationInput(BaseModel):
     device_token: str
 
     platform: DevicePlatform
@@ -246,18 +195,27 @@ class DeviceRegistration(BaseModel):
 
     device_name: Optional[str] = Field(default=None)
 
-    registered_at: datetime
 
+class DeviceRegistration(DeviceRegistrationInput):
+    id: str = Field(
+        default_factory=lambda: uuid4().hex,
+        validation_alias=AliasChoices("id", "_id"),
+        serialization_alias="_id",
+    )
 
-# ============================================================================
-# STORED NOTIFICATION
-# ============================================================================
+    user_id: str
+
+    registered_at: float = Field(default_factory=time.time)
 
 
 class NotificationRecord(BaseModel):
-    id: UUID
+    id: str = Field(
+        default_factory=lambda: uuid4().hex,
+        validation_alias=AliasChoices("id", "_id"),
+        serialization_alias="_id",
+    )
 
-    user_id: UUID
+    user_id: str
 
     title: str
 
@@ -265,18 +223,13 @@ class NotificationRecord(BaseModel):
 
     is_read: bool = Field(default=False)
 
-    read_at: Optional[datetime] = Field(default=None)
+    read_at: Optional[float] = Field(default=None)
 
-    delivery_status: DeliveryStatus
+    delivery_status: DeliveryStatus = Field(default=DeliveryStatus.PENDING)
 
-    created_at: datetime
+    created_at: float = Field(default_factory=time.time)
 
-    delivered_at: Optional[datetime] = Field(default=None)
-
-
-# ============================================================================
-# MAPPER
-# ============================================================================
+    delivered_at: Optional[float] = Field(default=None)
 
 
 def to_fcm_payload(
