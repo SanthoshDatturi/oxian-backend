@@ -31,7 +31,16 @@ from app.schemas.crop_recommendation import (
 from app.schemas.farm_profile import FarmProfileFields
 from app.schemas.generic_types import PersistenceLanguage
 from app.schemas.process import Process, ProcessError, State
+from app.schemas.notification import (
+    Destination,
+    DestinationType,
+    NotificationContent,
+    NotificationRequest,
+    NotificationTarget,
+    NotificationTargetType,
+)
 from app.services import crop_image_service
+from app.services import notification_service
 
 logger = logging.getLogger(__name__)
 
@@ -59,6 +68,31 @@ _MONTH_SEASON: dict[int, str] = {
 
 def _season_hint(today: date) -> str:
     return _MONTH_SEASON.get(today.month, "Unknown")
+
+
+async def _send_recommendation_ready_notification(
+    *,
+    user_id: str,
+    farm_name: str,
+    recommendation_id: str,
+) -> None:
+    await notification_service.send_notification(
+        NotificationRequest(
+            target=NotificationTarget(
+                type=NotificationTargetType.USER,
+                user_id=user_id,
+            ),
+            content=NotificationContent(
+                title="Crop recommendation ready",
+                body=f"Crop recommendation for {farm_name} ready to view",
+            ),
+            destination=Destination(
+                type=DestinationType.APP_ROUTE,
+                destination="CropRecommendationScreen",
+                params={"id": recommendation_id},
+            ),
+        )
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -377,7 +411,19 @@ async def _run_job(
                 "Failed to delete process after completion process_id=%s", process.id
             )
 
-        future.set_result(saved_recommendation)
+        try:
+            future.set_result(saved_recommendation)
+        except asyncio.InvalidStateError:
+            logger.info(
+                "Recommendation future already completed; sending notification process_id=%s recommendation_id=%s",
+                process.id,
+                saved_recommendation.id,
+            )
+            await _send_recommendation_ready_notification(
+                user_id=user_id,
+                farm_name=farm_fields.name,
+                recommendation_id=saved_recommendation.id,
+            )
 
     except asyncio.CancelledError:
         logger.info(
@@ -400,7 +446,13 @@ async def _run_job(
             message="Failed to run crop recommendation job.",
         )
         await process_repository.save(process)
-        future.set_exception(exc)
+        try:
+            future.set_exception(exc)
+        except asyncio.InvalidStateError:
+            logger.info(
+                "Recommendation future already completed while reporting failure process_id=%s",
+                process.id,
+            )
     finally:
         process_manager.remove(process.id)
 
