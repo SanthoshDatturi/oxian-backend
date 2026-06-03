@@ -1,7 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException
 
 from app.core.dependencies import authenticate_rest
-from app.schemas.notification import DeviceRegistration, DeviceRegistrationInput
+from app.schemas.notification import (
+    DeviceRegistration,
+    DeviceRegistrationInput,
+    DeviceTokenRefreshInput,
+)
 from app.services import notification_service
 
 router = APIRouter(prefix="/notifications", tags=["Notifications"])
@@ -23,15 +27,34 @@ async def register_device(
     return await notification_service.register_device(user_id=user_id, payload=payload)
 
 
-@router.delete("/devices/{device_token}", status_code=204)
+@router.patch("/devices/{device_id}", response_model=DeviceRegistration)
+async def refresh_device_registration(
+    device_id: str,
+    payload: DeviceTokenRefreshInput,
+    user_payload: dict = Depends(authenticate_rest),
+) -> DeviceRegistration:
+    user_id = _get_user_id(user_payload)
+    try:
+        return await notification_service.refresh_device_registration(
+            user_id=user_id,
+            device_id=device_id,
+            payload=payload,
+        )
+    except LookupError as exc:
+        raise HTTPException(
+            status_code=404, detail="Device registration not found"
+        ) from exc
+
+
+@router.delete("/devices/{device_id}", status_code=204)
 async def deregister_device(
-    device_token: str,
+    device_id: str,
     user_payload: dict = Depends(authenticate_rest),
 ):
     user_id = _get_user_id(user_payload)
     deleted = await notification_service.deregister_device(
         user_id=user_id,
-        device_token=device_token,
+        device_id=device_id,
     )
     if not deleted:
         raise HTTPException(status_code=404, detail="Device registration not found")

@@ -76,6 +76,10 @@ class NotificationContent(BaseModel):
     image: Optional[HttpUrl] = Field(default=None)
 
 
+class Screen(StrEnum):
+    CROP_RECOMMENDATION = "crop_recommendation"
+
+
 class Destination(BaseModel):
     """
     Navigation target when the user taps
@@ -86,7 +90,7 @@ class Destination(BaseModel):
 
     url: Optional[HttpUrl] = Field(default=None)
 
-    destination: Optional[str] = Field(default=None)
+    screen: Optional[Screen] = Field(default=None)
 
     params: Dict[str, Any] = Field(default_factory=dict)
 
@@ -194,6 +198,10 @@ class DeviceRegistrationInput(BaseModel):
     app_version: Optional[str] = Field(default=None)
 
     device_name: Optional[str] = Field(default=None)
+
+
+class DeviceTokenRefreshInput(BaseModel):
+    device_token: str
 
 
 class DeviceRegistration(DeviceRegistrationInput):

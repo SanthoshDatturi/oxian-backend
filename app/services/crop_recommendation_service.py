@@ -30,7 +30,6 @@ from app.schemas.crop_recommendation import (
 )
 from app.schemas.farm_profile import FarmProfileFields
 from app.schemas.generic_types import PersistenceLanguage
-from app.schemas.process import Process, ProcessError, State
 from app.schemas.notification import (
     Destination,
     DestinationType,
@@ -38,9 +37,10 @@ from app.schemas.notification import (
     NotificationRequest,
     NotificationTarget,
     NotificationTargetType,
+    Screen,
 )
-from app.services import crop_image_service
-from app.services import notification_service
+from app.schemas.process import Process, ProcessError, State
+from app.services import crop_image_service, notification_service
 
 logger = logging.getLogger(__name__)
 
@@ -88,8 +88,8 @@ async def _send_recommendation_ready_notification(
             ),
             destination=Destination(
                 type=DestinationType.APP_ROUTE,
-                destination="CropRecommendationScreen",
-                params={"id": recommendation_id},
+                screen=Screen.CROP_RECOMMENDATION,
+                params={"recommendation_id": recommendation_id},
             ),
         )
     )
@@ -254,7 +254,7 @@ async def _translate_recommendation(
     ).with_structured_output(CropRecommendationFields)
     response = await model.ainvoke(prompt)
     translated_user = CropRecommendationFields.model_validate(response)
-    
+
     return TranslatedCropRecommendationFields(
         english=fields,
         user_language=translated_user,
@@ -339,7 +339,10 @@ async def _run_job(
             try:
                 english_fields = CropRecommendationFields.model_validate(raw_data)
             except Exception as exc:
-                return {"status": "error", "message": f"Schema validation failed: {exc}"}
+                return {
+                    "status": "error",
+                    "message": f"Schema validation failed: {exc}",
+                }
 
             # --- Translate to user language ------------------------------------
             try:
@@ -400,9 +403,7 @@ async def _run_job(
         await agent.ainvoke({"messages": [user_message]})
 
         if saved_recommendation is None:
-            raise RuntimeError(
-                "Agent did not call save_crop_recommendation tool."
-            )
+            raise RuntimeError("Agent did not call save_crop_recommendation tool.")
 
         try:
             await process_repository.delete(process.id)
@@ -426,9 +427,7 @@ async def _run_job(
             )
 
     except asyncio.CancelledError:
-        logger.info(
-            "Crop recommendation job was cancelled process_id=%s", process.id
-        )
+        logger.info("Crop recommendation job was cancelled process_id=%s", process.id)
         try:
             await process_repository.delete(process.id)
         except Exception:
@@ -501,7 +500,9 @@ async def generate_crop_recommendation(
     process = Process(status=State.PENDING)
     process = await process_repository.create(process)
 
-    future: asyncio.Future[CropRecommendation] = asyncio.get_event_loop().create_future()
+    future: asyncio.Future[CropRecommendation] = (
+        asyncio.get_event_loop().create_future()
+    )
     await _enqueue_job(
         process=process,
         user_id=user_id,
