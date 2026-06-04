@@ -3,7 +3,7 @@ import io
 import json
 import logging
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, datetime
 from typing import Any, cast
 
 from google import genai
@@ -743,7 +743,7 @@ async def list_chat_messages(
     user_id: str,
     chat_id: str,
     limit: int = 50,
-    since: float | None = None,
+    since: datetime | None = None,
 ) -> list[Message]:
     chat = await get_chat_by_id(user_id=user_id, chat_id=chat_id)
     if chat is None:

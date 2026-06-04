@@ -1,5 +1,6 @@
 import json
 import logging
+from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
@@ -164,15 +165,23 @@ async def list_messages(
     chat_id: str,
     user_payload: dict = Depends(authenticate_rest),
     limit: int = Query(default=50, ge=1, le=200),
-    since: float | None = Query(default=None, ge=0),
+    since: str | None = Query(default=None),
 ) -> list[Message]:
     user_id = _get_user_id(user_payload)
+    parsed_since: datetime | None = None
+    if since is not None:
+        try:
+            parsed_since = datetime.fromisoformat(since.replace("Z", "+00:00"))
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=400, detail=f"Invalid since timestamp: {exc}"
+            )
     try:
         return await list_chat_messages(
             chat_id=chat_id,
             user_id=user_id,
             limit=limit,
-            since=since,
+            since=parsed_since,
         )
     except ValueError:
         raise HTTPException(status_code=404, detail="Chat not found")

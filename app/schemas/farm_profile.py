@@ -1,4 +1,4 @@
-import time
+from datetime import datetime, timezone
 from typing import List, Optional
 from uuid import uuid4
 
@@ -377,34 +377,7 @@ class FarmProfileFields(BaseModel):
 TranslatedFarmProfileFields = TranslatedFields[FarmProfileFields]
 
 
-class FarmProfile(FarmProfileFields):
-    """
-    Represents the complete profile of a farm including both core fields and metadata such as unique identifiers and ownership information.
-    This model is used for API responses and includes all necessary information to represent a farm profile in the system.
-    """
-
-    id: str = Field(
-        description="Unique identifier for the farm profile.",
-        validation_alias=AliasChoices("id", "_id"),
-        serialization_alias="_id",
-    )
-
-    user_id: str = Field(
-        description="Unique identifier of the farmer who owns or manages the farm."
-    )
-
-    created_at: float = Field(default_factory=time.time)
-
-    updated_at: float = Field(default_factory=time.time)
-
-
-# Backend only Model
-class FarmProfileDocument(TranslatedFarmProfileFields):
-    """
-    Represents the farm profile data structure used for persistence in the database.
-    This model is designed to be stored as a single document in a NoSQL database like MongoDB.
-    """
-
+class FarmProfileMetadata(BaseModel):
     id: str = Field(
         default_factory=lambda: uuid4().hex,
         description="Unique identifier for the farm profile.",
@@ -416,6 +389,25 @@ class FarmProfileDocument(TranslatedFarmProfileFields):
         description="Unique identifier of the farmer who owns or manages the farm."
     )
 
-    created_at: float = Field(default_factory=time.time)
+    created_at: datetime = Field(
+        default_factory=lambda: datetime.now(timezone.utc),
+    )
 
-    updated_at: float = Field(default_factory=time.time)
+    updated_at: datetime = Field(
+        default_factory=lambda: datetime.now(timezone.utc),
+    )
+
+
+class FarmProfile(FarmProfileMetadata, FarmProfileFields):
+    """
+    Represents the complete profile of a farm including both core fields and metadata such as unique identifiers and ownership information.
+    This model is used for API responses and includes all necessary information to represent a farm profile in the system.
+    """
+
+
+# Backend only Model
+class FarmProfileDocument(FarmProfileMetadata, TranslatedFarmProfileFields):
+    """
+    Represents the farm profile data structure used for persistence in the database.
+    This model is designed to be stored as a single document in a NoSQL database like MongoDB.
+    """

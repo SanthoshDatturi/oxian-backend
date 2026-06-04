@@ -1,4 +1,4 @@
-import time
+from datetime import datetime, timezone
 from uuid import uuid4
 
 from pydantic import AliasChoices, Field
@@ -16,7 +16,6 @@ class CropImageGenerateRequest(BaseCropImageFields):
     image_file_id: str = Field(
         ..., description="The ID of the image file to be generated."
     )
-    created_at: float = Field(
-        default_factory=time.time,
+    created_at: datetime = Field(
+        default_factory=lambda: datetime.now(timezone.utc),
     )
-

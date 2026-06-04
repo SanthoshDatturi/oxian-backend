@@ -1,13 +1,14 @@
-import time
-from datetime import date
+from datetime import date, datetime, timezone
 from enum import StrEnum
 from typing import List, Optional
 from uuid import uuid4
 
 from pydantic import AliasChoices, BaseModel, Field
 
+from .cultivating_crop import BaseCrop
 from .farm_profile import CropYield
 from .generic_types import Level, MoneyValue, TranslatedFields
+from .intercropping_details import SpecificArrangement
 
 
 class RecommendationGoal(StrEnum):
@@ -400,25 +401,6 @@ class CropRecommendationReasoningReport(BaseModel):
     )
 
 
-class BaseCrop(BaseModel):
-    """Represents a crop entity used in crop recommendations."""
-
-    name: str = Field(description="Name of the crop. Example: Rice")
-
-    variety: Optional[str] = Field(
-        default=None,
-        description="Recommended crop variety or cultivar. Example: BPT 5204",
-    )
-
-    image_file_id: Optional[str] = Field(
-        default=None, description="Identifier of the crop reference image if available."
-    )
-
-    description: str = Field(
-        description="Short farmer-friendly description of the crop."
-    )
-
-
 class MonoCropCandidate(BaseCrop):
     """
     Represents a single crop recommendation candidate suitable for cultivation on a farm.
@@ -475,16 +457,6 @@ class MonoCropCandidate(BaseCrop):
 
     recommendation_summary: str = Field(
         description="Farmer-friendly summary explaining why this crop is suitable for the farm."
-    )
-
-
-class SpecificArrangement(BaseModel):
-    """Describes the specific arrangement for a single crop in an intercropping system."""
-
-    crop_name: str = Field(description="Name of the crop as in the recommendation.")
-    variety: str = Field(description="Variety of the crop as in the recommendation.")
-    arrangement: str = Field(
-        description="Spacing or pattern for this specific crop. E.g., '2 rows of beans between every 6 rows of maize'."
     )
 
 
@@ -619,25 +591,27 @@ class CropRecommendationFields(BaseModel):
     )
 
 
-class CropRecommendation(CropRecommendationFields):
+class CropRecommendationMetadata(BaseModel):
     id: str = Field(
         default_factory=lambda: uuid4().hex,
-        description="Unique identifier for the recommendation result.",
+        description="Unique identifier of the crop recommendation result.",
         validation_alias=AliasChoices("id", "_id"),
         serialization_alias="_id",
     )
 
+    farm_id: str = Field(
+        description="Unique identifier of the farm for which the recommendation was generated."
+    )
+
+    created_at: datetime = Field(
+        default_factory=lambda: datetime.now(timezone.utc),
+        description="UTC Timestamp when the recommendation result was generated.",
+    )
+
+
+class CropRecommendation(CropRecommendationMetadata, CropRecommendationFields):
     request: CropRecommendationRequest = Field(
         description="Original crop recommendation request containing farmer preferences and constraints used for generating this recommendation.",
-    )
-
-    farm_id: str = Field(
-        description="Identifier of the farm for which recommendations were generated.",
-    )
-
-    created_at: float = Field(
-        default_factory=time.time,
-        description="Timestamp when the recommendation result was generated.",
     )
 
 
@@ -645,23 +619,9 @@ TranslatedCropRecommendationFields = TranslatedFields[CropRecommendationFields]
 
 
 # Backend only Model
-class CropRecommendationDocument(TranslatedCropRecommendationFields):
-    id: str = Field(
-        default_factory=lambda: uuid4().hex,
-        description="Unique identifier for the recommendation result.",
-        validation_alias=AliasChoices("id", "_id"),
-        serialization_alias="_id",
-    )
-
+class CropRecommendationDocument(
+    CropRecommendationMetadata, TranslatedCropRecommendationFields
+):
     request: CropRecommendationRequest = Field(
         description="Original crop recommendation request containing farmer preferences and constraints used for generating this recommendation.",
-    )
-
-    farm_id: str = Field(
-        description="Identifier of the farm for which recommendations were generated.",
-    )
-
-    created_at: float = Field(
-        default_factory=time.time,
-        description="Timestamp when the recommendation result was generated.",
     )

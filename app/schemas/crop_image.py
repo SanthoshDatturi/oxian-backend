@@ -1,4 +1,4 @@
-import time
+from datetime import datetime, timezone
 from typing import List, Optional
 from uuid import uuid4
 
@@ -22,8 +22,10 @@ class CropImageFile(BaseCropImageFields):
         validation_alias=AliasChoices("id", "_id"),
         serialization_alias="_id",
     )
+
     embedding: List[float]
-    created_at: float = Field(default_factory=time.time)
+
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
     @field_validator("embedding")
     @classmethod
@@ -46,12 +48,14 @@ class HybridCropImageSearchResult(BaseModel):
     crop_name: str = Field(
         description="Original crop name query provided by the caller. Example: Rice"
     )
+
     keyword_matches: list[RetrievedCropImageFile] = Field(
         default_factory=list,
         description=(
             "Crop image records found by keyword search against crop names and aliases."
         ),
     )
+
     similarity_matches: list[RetrievedCropImageFile] = Field(
         default_factory=list,
         description=(

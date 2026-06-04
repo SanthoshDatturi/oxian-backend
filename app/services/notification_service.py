@@ -1,5 +1,5 @@
 import logging
-import time
+from datetime import datetime, timezone
 
 from firebase_admin import exceptions as firebase_exceptions
 from firebase_admin import messaging
@@ -22,8 +22,8 @@ from app.schemas.notification import (
 logger = logging.getLogger(__name__)
 
 
-def _now() -> float:
-    return time.time()
+def _now() -> datetime:
+    return datetime.now(timezone.utc)
 
 
 async def register_device(
@@ -93,7 +93,7 @@ async def _create_notification_record(
     user_id: str,
     request: NotificationRequest,
     delivery_status: DeliveryStatus,
-    delivered_at: float | None = None,
+    delivered_at: datetime | None = None,
 ) -> NotificationRecord:
     if request.content is None:
         raise ValueError("Notification content is required.")

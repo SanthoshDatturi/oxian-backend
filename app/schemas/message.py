@@ -1,4 +1,4 @@
-import time
+from datetime import datetime, timezone
 from enum import StrEnum
 from typing import Annotated, Any, Literal
 from uuid import uuid4
@@ -100,5 +100,5 @@ class Message(BaseModel):
     usage: MessageUsage | None = None
     error: MessageError | None = None
     metadata: dict[str, Any] = Field(default_factory=dict)
-    created_at: float = Field(default_factory=time.time)
-    updated_at: float = Field(default_factory=time.time)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))

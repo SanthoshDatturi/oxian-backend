@@ -1,4 +1,4 @@
-import time
+from datetime import datetime, timezone
 from enum import StrEnum
 from typing import Optional
 from uuid import uuid4
@@ -26,4 +26,4 @@ class File(BaseModel):
     storage_scope: StorageScope = StorageScope.USER
     entity_id: Optional[str] = Field(default=None)
     status: FileStatus
-    created_at: float = Field(default_factory=time.time)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))

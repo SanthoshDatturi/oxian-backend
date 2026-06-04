@@ -1,11 +1,11 @@
-import time
+from datetime import datetime, timezone
 
 from app.integrations.database.mogodb import get_messages_collection
 from app.schemas.message import Message
 
 
 def _touch(message: Message) -> Message:
-    return message.model_copy(update={"updated_at": time.time()})
+    return message.model_copy(update={"updated_at": datetime.now(timezone.utc)})
 
 
 async def create(message: Message) -> Message:
@@ -47,7 +47,7 @@ async def list_by_chat(chat_id: str, limit: int = 50) -> list[Message]:
 
 
 async def list_by_chat_since(
-    chat_id: str, *, since: float, limit: int = 50
+    chat_id: str, *, since: datetime, limit: int = 50
 ) -> list[Message]:
     cursor = (
         get_messages_collection()

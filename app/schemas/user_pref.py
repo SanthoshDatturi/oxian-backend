@@ -1,4 +1,4 @@
-import time
+from datetime import datetime, timezone
 from uuid import uuid4
 
 from pydantic import AliasChoices, BaseModel, Field
@@ -13,5 +13,5 @@ class UserPreference(BaseModel):
     user_id: str
     language_code: str | None = None
     voice_response_enabled: bool = False
-    created_at: float = Field(default_factory=time.time)
-    updated_at: float = Field(default_factory=time.time)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))

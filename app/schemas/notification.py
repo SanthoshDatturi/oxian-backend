@@ -1,5 +1,5 @@
 import json
-import time
+from datetime import datetime, timezone
 from enum import StrEnum
 from typing import Any, Dict, List, Optional
 from uuid import uuid4
@@ -213,7 +213,7 @@ class DeviceRegistration(DeviceRegistrationInput):
 
     user_id: str
 
-    registered_at: float = Field(default_factory=time.time)
+    registered_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class NotificationRecord(BaseModel):
@@ -231,13 +231,13 @@ class NotificationRecord(BaseModel):
 
     is_read: bool = Field(default=False)
 
-    read_at: Optional[float] = Field(default=None)
+    read_at: Optional[datetime] = Field(None)
 
     delivery_status: DeliveryStatus = Field(default=DeliveryStatus.PENDING)
 
-    created_at: float = Field(default_factory=time.time)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
-    delivered_at: Optional[float] = Field(default=None)
+    delivered_at: Optional[datetime] = Field(None)
 
 
 def to_fcm_payload(
