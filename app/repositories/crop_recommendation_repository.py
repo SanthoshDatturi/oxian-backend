@@ -1,5 +1,3 @@
-import time
-
 from app.integrations.database.mogodb import get_crop_recommendations_collection
 from app.schemas.crop_recommendation import (
     CropRecommendation,
@@ -100,6 +98,19 @@ async def get_by_id(
     return _to_crop_recommendation(document, language)
 
 
+async def get_document_by_id(
+    recommendation_id: str,
+    farm_id: str | None = None,
+) -> CropRecommendationDocument | None:
+    query: dict[str, str] = {"_id": recommendation_id}
+    if farm_id:
+        query["farm_id"] = farm_id
+    document = await get_crop_recommendations_collection().find_one(query)
+    if not document:
+        return None
+    return CropRecommendationDocument.model_validate(document)
+
+
 async def list_by_farm(
     farm_id: str,
     language: PersistenceLanguage,
@@ -118,9 +129,7 @@ async def list_by_farm(
         .sort("created_at", -1)
         .limit(limit)
     )
-    return [
-        _to_crop_recommendation(document, language) async for document in cursor
-    ]
+    return [_to_crop_recommendation(document, language) async for document in cursor]
 
 
 async def delete(

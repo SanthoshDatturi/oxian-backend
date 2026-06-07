@@ -142,3 +142,11 @@ def get_crop_image_generate_requests_collection() -> AsyncIOMotorCollection:
 
 def get_crop_recommendations_collection() -> AsyncIOMotorCollection:
     return _get_collection("crop_recommendations")
+
+
+def get_cultivation_crops_collection() -> AsyncIOMotorCollection:
+    return _get_collection("cultivation_crops")
+
+
+def get_intercropping_details_collection() -> AsyncIOMotorCollection:
+    return _get_collection("intercropping_details")

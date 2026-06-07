@@ -5,10 +5,10 @@ from uuid import uuid4
 
 from pydantic import AliasChoices, BaseModel, Field
 
-from .cultivating_crop import BaseCrop
+from .cultivation_crop import BaseCrop
 from .farm_profile import CropYield
 from .generic_types import Level, MoneyValue, TranslatedFields
-from .intercropping_details import SpecificArrangement
+from .intercropping_details import IntercropType, SpecificArrangement
 
 
 class RecommendationGoal(StrEnum):
@@ -458,17 +458,6 @@ class MonoCropCandidate(BaseCrop):
     recommendation_summary: str = Field(
         description="Farmer-friendly summary explaining why this crop is suitable for the farm."
     )
-
-
-class IntercropType(StrEnum):
-    """Represents common intercropping system types."""
-
-    ROW = "row_intercropping"
-    MIXED = "mixed_intercropping"
-    STRIP = "strip_intercropping"
-    RELAY = "relay_intercropping"
-    MULTI_STOREY = "multi_storey_intercropping"
-    OTHER = "other"
 
 
 class IntercropComponentRole(StrEnum):
