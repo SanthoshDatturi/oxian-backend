@@ -5,6 +5,7 @@ from uuid import uuid4
 from langchain_core.runnables.configurable import StrEnum
 from pydantic import AliasChoices, BaseModel, Field, model_validator
 
+from .agricultural_input import InputCategory
 from .generic_types import Area, AreaUnit, LatLng, Quantity, TranslatedFields
 
 
@@ -172,20 +173,8 @@ class CropSeason(StrEnum):
     WINTER = "Winter"
 
 
-class AgriculturalInputCategory(StrEnum):
-    FERTILIZER = "fertilizer"
-    PESTICIDE = "pesticide"
-    HERBICIDE = "herbicide"
-    FUNGICIDE = "fungicide"
-    MICRONUTRIENT = "micronutrient"
-    BIO_STIMULANT = "bio_stimulant"
-    OTHER = "other"
-
-
 class AgriculturalInput(BaseModel):
-    category: AgriculturalInputCategory = Field(
-        description="Category of agricultural input."
-    )
+    category: InputCategory = Field(description="Category of agricultural input.")
 
     name: str = Field(
         description="Commercial or generic name of the agricultural input. Example: Urea"
