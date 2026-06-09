@@ -19,14 +19,12 @@ from app.repositories import (
     crop_recommendation_repository,
     farm_profile_repository,
     process_repository,
-    user_pref_repository,
 )
 from app.schemas.crop_recommendation import (
     CropRecommendation,
     CropRecommendationDocument,
     CropRecommendationFields,
     CropRecommendationRequest,
-    TranslatedCropRecommendationFields,
 )
 from app.schemas.farm_profile import FarmProfileFields
 from app.schemas.generic_types import PersistenceLanguage
@@ -40,7 +38,7 @@ from app.schemas.notification import (
     Screen,
 )
 from app.schemas.process import Process, ProcessError, State
-from app.services import crop_image_service, notification_service
+from app.services import crop_image_service, notification_service, translation_service
 
 logger = logging.getLogger(__name__)
 
@@ -222,45 +220,6 @@ def _build_user_message(
 # ---------------------------------------------------------------------------
 
 
-async def _translate_recommendation(
-    *,
-    user_id: str,
-    fields: CropRecommendationFields,
-) -> TranslatedCropRecommendationFields:
-    """Translate English CropRecommendationFields into the user's preferred language."""
-    preference = await user_pref_repository.get_by_user_id(user_id)
-    user_language_code = preference.language_code if preference else None
-
-    # Skip translation entirely if the target language is English or not set
-    if not user_language_code or user_language_code.lower() in ("en", "english", "eng"):
-        return TranslatedCropRecommendationFields(
-            english=fields,
-            user_language=fields,
-        )
-
-    prompt = PromptManager.get_prompt(
-        "crop_recommendation_translation",
-        source_language="english",
-        user_language_code=user_language_code,
-        recommendation_json=json.dumps(fields.model_dump(mode="json"), indent=2),
-        output_schema_json=json.dumps(
-            CropRecommendationFields.model_json_schema(),
-            indent=2,
-        ),
-    )
-    model = ChatGoogleGenerativeAI(
-        model=settings.GEMINI_CHAT_MODEL,
-        temperature=0,
-    ).with_structured_output(CropRecommendationFields)
-    response = await model.ainvoke(prompt)
-    translated_user = CropRecommendationFields.model_validate(response)
-
-    return TranslatedCropRecommendationFields(
-        english=fields,
-        user_language=translated_user,
-    )
-
-
 # ---------------------------------------------------------------------------
 # Core job — mirrors _run_turn in chat_service.py
 # ---------------------------------------------------------------------------
@@ -346,32 +305,28 @@ async def _run_job(
 
             # --- Translate to user language ------------------------------------
             try:
-                translated = await _translate_recommendation(
-                    user_id=user_id,
-                    fields=english_fields,
+                user_language_fields = await translation_service.to_user_language(
+                    user_id=user_id, fields=english_fields
                 )
             except Exception:
                 logger.exception(
                     "Translation failed for farm_id=%s; using English for both slots.",
                     farm_id,
                 )
-                translated = TranslatedCropRecommendationFields(
-                    english=english_fields,
-                    user_language=english_fields,
-                )
+                user_language_fields = english_fields
 
             # --- Persist -------------------------------------------------------
             doc = CropRecommendationDocument(
                 farm_id=farm_id,
                 request=request,
-                english=translated.english,
-                user_language=translated.user_language,
+                english=english_fields,
+                user_language=user_language_fields,
             )
             doc = await crop_recommendation_repository.create(doc)
 
             saved_recommendation = CropRecommendation.model_validate(
                 {
-                    **translated.user_language.model_dump(mode="json"),
+                    **user_language_fields.model_dump(mode="json"),
                     "id": doc.id,
                     "farm_id": farm_id,
                     "request": request.model_dump(mode="json"),
