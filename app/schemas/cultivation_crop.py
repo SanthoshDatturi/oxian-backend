@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 from enum import Enum
 from typing import Optional
+from uuid import uuid4
 
 from pydantic import AliasChoices, BaseModel, Field
 
@@ -14,17 +15,14 @@ class BaseCrop(BaseModel):
     """
 
     name: str = Field(description="Name of the crop. Example: Rice")
-
     variety: Optional[str] = Field(
         default=None,
         description="Recommended or selected crop variety or cultivar. Example: BPT 5204",
     )
-
     image_file_id: Optional[str] = Field(
         default=None,
         description="Identifier of a reference image representing the crop or crop variety.",
     )
-
     description: str = Field(
         description=(
             "Farmer-friendly summary describing the crop, its key characteristics, "
@@ -45,41 +43,16 @@ class CropState(str, Enum):
     FAILED = "failed"
 
 
-class CultivationCropFields(BaseCrop):
-    """
-    Represents the core cultivation-specific information for a crop
-    selected by the farmer for cultivation.
-    """
-
-    crop_state: CropState = Field(
-        default=CropState.SELECTED,
-        description=(
-            "Current lifecycle state of the crop within the cultivation process."
-        ),
-    )
-
-    selected_area: Area = Field(
-        description=(
-            "Area allocated for cultivating this crop. "
-            "This may represent the full farm area or only a portion of the farm."
-        )
-    )
-
-
-TranslatedCultivationCropFields = TranslatedFields[CultivationCropFields]
-
-
-class CultivationCropMetadata(BaseModel):
+class CultivationCropInvariantFields(BaseModel):
     id: str = Field(
+        default_factory=lambda: uuid4().hex,
         description="Unique identifier of the cultivation crop instance.",
         validation_alias=AliasChoices("id", "_id"),
         serialization_alias="_id",
     )
-
     farm_id: str = Field(
         description="Unique identifier of the farm where the crop is being cultivated."
     )
-
     recommendation_id: Optional[str] = Field(
         default=None,
         description=(
@@ -87,7 +60,6 @@ class CultivationCropMetadata(BaseModel):
             "Null when the crop was manually added by the farmer."
         ),
     )
-
     intercropping_id: Optional[str] = Field(
         default=None,
         description=(
@@ -95,27 +67,42 @@ class CultivationCropMetadata(BaseModel):
             "Null when cultivated as a mono crop."
         ),
     )
-
+    crop_state: CropState = Field(
+        default=CropState.SELECTED,
+        description=(
+            "Current lifecycle state of the crop within the cultivation process."
+        ),
+    )
+    selected_area: Area = Field(
+        description=(
+            "Area allocated for cultivating this crop. "
+            "This may represent the full farm area or only a portion of the farm."
+        )
+    )
     created_at: datetime = Field(
         default_factory=lambda: datetime.now(timezone.utc),
         description="UTC Timestamp when the cultivation crop record was created.",
     )
-
     updated_at: datetime = Field(
         default_factory=lambda: datetime.now(timezone.utc),
         description="UTC Timestamp when the cultivation crop record was last updated.",
     )
 
 
-class CultivationCrop(CultivationCropMetadata, CultivationCropFields):
+class CultivationCrop(CultivationCropInvariantFields, BaseCrop):
     """
     Represents an individual crop selected by the farmer for cultivation
     on a farm.
     """
 
 
+TranslatedCultivationCropFields = TranslatedFields[BaseCrop]
+
+
 # Backend-only model
-class CultivationCropDocument(CultivationCropMetadata, TranslatedCultivationCropFields):
+class CultivationCropDocument(
+    CultivationCropInvariantFields, TranslatedCultivationCropFields
+):
     """
     Represents the cultivation crop document stored in the database,
     including multilingual representations used for reasoning and display.

@@ -1,5 +1,6 @@
 from enum import StrEnum
 from typing import List, Optional
+from uuid import uuid4
 
 from pydantic import AliasChoices, BaseModel, Field
 
@@ -16,7 +17,6 @@ class SpecificArrangement(BaseModel):
             "Name of the crop participating in the intercropping system. Example: Maize"
         )
     )
-
     variety: Optional[str] = Field(
         default=None,
         description=(
@@ -24,7 +24,6 @@ class SpecificArrangement(BaseModel):
             "Example: DHM-117"
         ),
     )
-
     arrangement: str = Field(
         description=(
             "Specific spacing, row pattern, or placement of this crop within the "
@@ -44,10 +43,9 @@ class IntercropType(StrEnum):
     OTHER = "other"
 
 
-class IntercroppingDetailsFields(BaseModel):
+class IntercroppingDetailsTranslatableFields(BaseModel):
     """
-    Defines the fields for IntercroppingDetails to be used in update operations.
-    This allows for partial updates while maintaining type safety and validation.
+    Farmer-facing intercropping details that can be translated.
     """
 
     arrangement: str = Field(
@@ -56,7 +54,6 @@ class IntercroppingDetailsFields(BaseModel):
             "Example: '6 rows of maize followed by 2 rows of beans'."
         )
     )
-
     specific_arrangement: List[SpecificArrangement] = Field(
         min_length=2,
         description=(
@@ -66,19 +63,17 @@ class IntercroppingDetailsFields(BaseModel):
     )
 
 
-class IntercroppingDetailsMetadata(BaseModel):
+class IntercroppingDetailsInvariantFields(BaseModel):
     """
-    Metadata for IntercroppingDetails, including fields that are not directly
-    part of the intercropping system's core information but are relevant for
-    management and tracking.
+    Metadata and operational fields for IntercroppingDetails that are not translated.
     """
 
     id: str = Field(
+        default_factory=lambda: uuid4().hex,
         description="Unique identifier of the intercropping system.",
         validation_alias=AliasChoices("id", "_id"),
         serialization_alias="_id",
     )
-
     recommendation_id: Optional[str] = Field(
         default=None,
         description=(
@@ -86,7 +81,6 @@ class IntercroppingDetailsMetadata(BaseModel):
             "this intercropping system was selected. Null when created manually."
         ),
     )
-
     intercrop_type: IntercropType = Field(
         description=(
             "Type of intercropping system selected. Examples include row "
@@ -95,7 +89,9 @@ class IntercroppingDetailsMetadata(BaseModel):
     )
 
 
-class IntercroppingDetails(IntercroppingDetailsMetadata, IntercroppingDetailsFields):
+class IntercroppingDetails(
+    IntercroppingDetailsInvariantFields, IntercroppingDetailsTranslatableFields
+):
     """
     Represents a selected intercropping system derived from an intercropping
     recommendation and associated with one or more cultivation crops.
@@ -104,11 +100,13 @@ class IntercroppingDetails(IntercroppingDetailsMetadata, IntercroppingDetailsFie
     """
 
 
-TranslatedIntercroppingDetailsFields = TranslatedFields[IntercroppingDetailsFields]
+TranslatedIntercroppingDetailsFields = TranslatedFields[
+    IntercroppingDetailsTranslatableFields
+]
 
 
 class IntercroppingDetailsDocument(
-    IntercroppingDetailsMetadata, TranslatedIntercroppingDetailsFields
+    IntercroppingDetailsInvariantFields, TranslatedIntercroppingDetailsFields
 ):
     """
     Represents the MongoDB document structure for IntercroppingDetails, including

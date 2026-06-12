@@ -3,7 +3,7 @@ from app.schemas.generic_types import PersistenceLanguage
 from app.schemas.intercropping_details import (
     IntercroppingDetails,
     IntercroppingDetailsDocument,
-    IntercroppingDetailsFields,
+    IntercroppingDetailsTranslatableFields,
 )
 
 
@@ -46,9 +46,9 @@ async def save_language(
     details: IntercroppingDetails,
     language: PersistenceLanguage,
 ) -> IntercroppingDetails:
-    fields = IntercroppingDetailsFields.model_validate(details).model_dump(
-        exclude_none=True, mode="json"
-    )
+    fields = IntercroppingDetailsTranslatableFields.model_validate(
+        details
+    ).model_dump(exclude_none=True, mode="json")
     await get_intercropping_details_collection().update_one(
         {"_id": details.id},
         {

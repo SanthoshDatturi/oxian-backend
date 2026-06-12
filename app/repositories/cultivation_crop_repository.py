@@ -2,9 +2,9 @@ from datetime import datetime, timezone
 
 from app.integrations.database.mogodb import get_cultivation_crops_collection
 from app.schemas.cultivation_crop import (
+    BaseCrop,
     CultivationCrop,
     CultivationCropDocument,
-    CultivationCropFields,
 )
 from app.schemas.generic_types import PersistenceLanguage
 
@@ -19,10 +19,16 @@ def _to_cultivation_crop(
         "id": document["_id"],
         "farm_id": document["farm_id"],
     }
+    crop_state = document.get("crop_state", fields.get("crop_state"))
+    selected_area = document.get("selected_area", fields.get("selected_area"))
     if document.get("recommendation_id") is not None:
         data["recommendation_id"] = document["recommendation_id"]
     if document.get("intercropping_id") is not None:
         data["intercropping_id"] = document["intercropping_id"]
+    if crop_state is not None:
+        data["crop_state"] = crop_state
+    if selected_area is not None:
+        data["selected_area"] = selected_area
     if document.get("created_at") is not None:
         data["created_at"] = document["created_at"]
     if document.get("updated_at") is not None:
@@ -63,7 +69,7 @@ async def save_language(
     language: PersistenceLanguage,
 ) -> CultivationCrop:
     crop = crop.model_copy(update={"updated_at": datetime.now(timezone.utc)})
-    fields = CultivationCropFields.model_validate(crop).model_dump(
+    fields = BaseCrop.model_validate(crop).model_dump(
         exclude_none=True, mode="json"
     )
     await get_cultivation_crops_collection().update_one(
@@ -73,6 +79,8 @@ async def save_language(
                 "farm_id": crop.farm_id,
                 "recommendation_id": crop.recommendation_id,
                 "intercropping_id": crop.intercropping_id,
+                "crop_state": crop.crop_state,
+                "selected_area": crop.selected_area.model_dump(mode="json"),
                 "updated_at": crop.updated_at,
                 language.value: fields,
             },
@@ -96,6 +104,8 @@ async def get_by_id(
         "farm_id": 1,
         "recommendation_id": 1,
         "intercropping_id": 1,
+        "crop_state": 1,
+        "selected_area": 1,
         "created_at": 1,
         "updated_at": 1,
         language.value: 1,
@@ -129,6 +139,8 @@ async def list_by_farm(
         "farm_id": 1,
         "recommendation_id": 1,
         "intercropping_id": 1,
+        "crop_state": 1,
+        "selected_area": 1,
         "created_at": 1,
         "updated_at": 1,
         language.value: 1,
@@ -152,6 +164,8 @@ async def list_by_intercropping(
         "farm_id": 1,
         "recommendation_id": 1,
         "intercropping_id": 1,
+        "crop_state": 1,
+        "selected_area": 1,
         "created_at": 1,
         "updated_at": 1,
         language.value: 1,
