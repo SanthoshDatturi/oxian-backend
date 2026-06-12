@@ -5,7 +5,7 @@ from uuid import uuid4
 from langchain_core.runnables.configurable import StrEnum
 from pydantic import AliasChoices, BaseModel, Field, model_validator
 
-from .agricultural_input import InputCategory
+from .agricultural_input_plan import InputCategory
 from .generic_types import Area, AreaUnit, LatLng, Quantity, TranslatedFields
 
 
