@@ -1,7 +1,13 @@
-import time
+from datetime import datetime, timezone
 
 from app.integrations.database.mogodb import get_farm_profiles_collection
-from app.schemas.farm_profile import FarmProfile, FarmProfileDocument, FarmProfileFields
+from app.schemas.farm_profile import (
+    FarmProfile,
+    FarmProfileDocument,
+    FarmProfileInputInvariantFields,
+    FarmProfileInvariantFields,
+    FarmProfileTranslatableFields,
+)
 from app.schemas.generic_types import PersistenceLanguage
 
 
@@ -9,21 +15,23 @@ def _to_farm_profile(
     document: dict,
     language: PersistenceLanguage,
 ) -> FarmProfile:
-    fields = document.get(language.value) or {}
-    data = {
-        **fields,
-        "id": document["_id"],
-        "user_id": document["user_id"],
-    }
-    if document.get("created_at") is not None:
-        data["created_at"] = document["created_at"]
-    if document.get("updated_at") is not None:
-        data["updated_at"] = document["updated_at"]
-    return FarmProfile.model_validate(data)
+    translatable_fields = document.get(language.value) or {}
+    invariant_data = dict(document)
+    for key in FarmProfileInputInvariantFields.model_fields:
+        value = document.get(key, translatable_fields.get(key))
+        if value is not None:
+            invariant_data[key] = value
+    invariant_fields = FarmProfileInvariantFields.model_validate(invariant_data)
+    return FarmProfile.model_validate(
+        {
+            **invariant_fields.model_dump(mode="json"),
+            **translatable_fields,
+        }
+    )
 
 
 def _touch(profile: FarmProfileDocument) -> FarmProfileDocument:
-    return profile.model_copy(update={"updated_at": time.time()})
+    return profile.model_copy(update={"updated_at": datetime.now(timezone.utc)})
 
 
 async def create(profile: FarmProfileDocument) -> FarmProfileDocument:
@@ -54,17 +62,21 @@ async def save_language(
     profile: FarmProfile,
     language: PersistenceLanguage,
 ) -> FarmProfile:
-    profile = profile.model_copy(update={"updated_at": time.time()})
-    fields = FarmProfileFields.model_validate(profile).model_dump(
-        exclude_none=True, mode="json"
-    )
+    profile = profile.model_copy(update={"updated_at": datetime.now(timezone.utc)})
+    translatable_fields = FarmProfileTranslatableFields.model_validate(
+        profile
+    ).model_dump(exclude_none=True, mode="json")
+    invariant_fields = FarmProfileInputInvariantFields.model_validate(
+        profile
+    ).model_dump(exclude_none=True, mode="json")
     await get_farm_profiles_collection().update_one(
         {"_id": profile.id, "user_id": profile.user_id},
         {
             "$set": {
                 "user_id": profile.user_id,
+                **invariant_fields,
                 "updated_at": profile.updated_at,
-                language.value: fields,
+                language.value: translatable_fields,
             },
             "$setOnInsert": {"created_at": profile.created_at},
         },
@@ -84,6 +96,12 @@ async def get_by_id(
     projection = {
         "_id": 1,
         "user_id": 1,
+        "soil_type": 1,
+        "total_area": 1,
+        "cultivated_area": 1,
+        "water_source": 1,
+        "irrigation_system": 1,
+        "soil_test_properties": 1,
         "created_at": 1,
         "updated_at": 1,
         language.value: 1,
@@ -102,6 +120,12 @@ async def list_by_user(
     projection = {
         "_id": 1,
         "user_id": 1,
+        "soil_type": 1,
+        "total_area": 1,
+        "cultivated_area": 1,
+        "water_source": 1,
+        "irrigation_system": 1,
+        "soil_test_properties": 1,
         "created_at": 1,
         "updated_at": 1,
         language.value: 1,

@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 
 from app.core.dependencies import authenticate_rest
-from app.schemas.farm_profile import FarmProfile, FarmProfileFields
+from app.schemas.farm_profile import FarmProfile, FarmProfileInput
 from app.services import farm_profile_service
 
 router = APIRouter(prefix="/farm-profiles", tags=["Farm Profiles"])
@@ -36,20 +36,20 @@ async def get_farm_profile(
 
 @router.post("/", response_model=FarmProfile, status_code=201)
 async def create_farm_profile(
-    payload: FarmProfileFields,
+    input: FarmProfileInput,
     user_payload: dict = Depends(authenticate_rest),
 ) -> FarmProfile:
     user_id = _get_user_id(user_payload)
     return await farm_profile_service.create_farm_profile(
         user_id=user_id,
-        fields=payload,
+        input=input,
     )
 
 
 @router.put("/{farm_id}", response_model=FarmProfile)
 async def update_farm_profile(
     farm_id: str,
-    payload: FarmProfileFields,
+    input: FarmProfileInput,
     user_payload: dict = Depends(authenticate_rest),
 ) -> FarmProfile:
     user_id = _get_user_id(user_payload)
@@ -60,7 +60,7 @@ async def update_farm_profile(
     return await farm_profile_service.update_farm_profile(
         farm_id=farm_id,
         user_id=user_id,
-        fields=payload,
+        input=input,
     )
 
 

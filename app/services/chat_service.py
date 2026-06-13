@@ -27,7 +27,17 @@ from app.repositories import (
     user_pref_repository,
 )
 from app.schemas.chat import Chat, ChatMode
-from app.schemas.farm_profile import FarmProfileFields, TranslatedFarmProfileFields
+from app.schemas.farm_profile import (
+    Area,
+    FarmProfileInputInvariantFields,
+    FarmProfileInvariantFields,
+    FarmProfileTranslatableFields,
+    IrrigationSystem,
+    SoilTestProperties,
+    SoilType,
+    TranslatedFarmProfileInput,
+    WaterSource,
+)
 from app.schemas.message import (
     ChatMessageInput,
     FarmProfileReferencePart,
@@ -334,7 +344,7 @@ async def _build_prompt(
     if mode == ChatMode.FARM_SURVEY:
         prompt_kwargs["user_id"] = user_id
         prompt_kwargs["farm_profile_schema_json"] = json.dumps(
-            TranslatedFarmProfileFields.model_json_schema(),
+            TranslatedFarmProfileInput.model_json_schema(),
             indent=2,
         )
     return PromptManager.get_prompt("chat", **prompt_kwargs)
@@ -373,15 +383,29 @@ async def _run_turn(
             chat_title=chat.title,
         )
 
-        @tool(args_schema=TranslatedFarmProfileFields)
+        @tool(args_schema=TranslatedFarmProfileInput)
         async def save_farm_profile(
-            english: FarmProfileFields,
-            user_language: FarmProfileFields,
+            soil_type: SoilType,
+            total_area: Area,
+            cultivated_area: Area,
+            water_source: WaterSource,
+            english: FarmProfileTranslatableFields,
+            user_language: FarmProfileTranslatableFields,
+            irrigation_system: IrrigationSystem | None = None,
+            soil_test_properties: SoilTestProperties | None = None,
         ) -> dict[str, str]:
             """Save a complete farm profile. Call only when all required FarmProfile fields are available."""
 
             nonlocal saved_farm_profile_part
             nonlocal active_chat
+            input_invariant_fields = FarmProfileInputInvariantFields(
+                soil_type=soil_type,
+                total_area=total_area,
+                cultivated_area=cultivated_area,
+                water_source=water_source,
+                irrigation_system=irrigation_system,
+                soil_test_properties=soil_test_properties,
+            )
 
             if active_chat.farm_profile_id:
                 existing_english = await farm_profile_service._get_farm_profile(
@@ -402,17 +426,27 @@ async def _run_turn(
                     existing_user_language.model_dump(mode="json", by_alias=False),
                     user_language.model_dump(mode="json"),
                 )
-                saved = await farm_profile_service._update_translated_farm_profile(
-                    farm_id=active_chat.farm_profile_id,
+                invariant_fields = FarmProfileInvariantFields(
+                    id=active_chat.farm_profile_id,
                     user_id=active_chat.user_id,
-                    english=FarmProfileFields.model_validate(merged_english),
-                    user_language=FarmProfileFields.model_validate(
+                    **input_invariant_fields.model_dump(),
+                )
+                saved = await farm_profile_service._update_translated_farm_profile(
+                    invariant_fields=invariant_fields,
+                    english=FarmProfileTranslatableFields.model_validate(
+                        merged_english
+                    ),
+                    user_language=FarmProfileTranslatableFields.model_validate(
                         merged_user_language
                     ),
                 )
             else:
-                saved = await farm_profile_service._create_translated_farm_profile(
+                invariant_fields = FarmProfileInvariantFields(
                     user_id=active_chat.user_id,
+                    **input_invariant_fields.model_dump(),
+                )
+                saved = await farm_profile_service._create_translated_farm_profile(
+                    invariant_fields=invariant_fields,
                     english=english,
                     user_language=user_language,
                 )

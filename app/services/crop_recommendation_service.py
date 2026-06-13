@@ -26,7 +26,6 @@ from app.schemas.crop_recommendation import (
     CropRecommendationFields,
     CropRecommendationRequest,
 )
-from app.schemas.farm_profile import FarmProfileFields
 from app.schemas.generic_types import PersistenceLanguage
 from app.schemas.notification import (
     Destination,
@@ -251,8 +250,14 @@ async def _run_job(
         if farm_profile is None:
             raise ValueError(f"Farm profile not found: farm_id={farm_id}")
 
-        farm_fields = FarmProfileFields.model_validate(farm_profile)
-        farm_profile_json = json.dumps(farm_fields.model_dump(mode="json"), indent=2)
+        farm_profile_json = json.dumps(
+            farm_profile.model_dump(
+                mode="json",
+                exclude={"id", "user_id", "created_at", "updated_at"},
+                exclude_none=True,
+            ),
+            indent=2,
+        )
         request_json = json.dumps(request.model_dump(mode="json"), indent=2)
 
         output_schema_json = json.dumps(
@@ -377,7 +382,7 @@ async def _run_job(
             )
             await _send_recommendation_ready_notification(
                 user_id=user_id,
-                farm_name=farm_fields.name,
+                farm_name=farm_profile.name,
                 recommendation_id=saved_recommendation.id,
             )
 

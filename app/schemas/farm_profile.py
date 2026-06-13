@@ -15,11 +15,9 @@ class SoilTexturePercentage(BaseModel):
     sand: float = Field(
         ge=0, le=100, description="Percentage of sand content in soil. Example: 40"
     )
-
     silt: float = Field(
         ge=0, le=100, description="Percentage of silt content in soil. Example: 35"
     )
-
     clay: float = Field(
         ge=0, le=100, description="Percentage of clay content in soil. Example: 25"
     )
@@ -40,57 +38,47 @@ class SoilTestProperties(BaseModel):
     soil_texture: SoilTexturePercentage = Field(
         description="Texture composition of the soil expressed as percentages of sand, silt, and clay."
     )
-
     ph_level: float = Field(
         ge=0,
         le=14,
         description="Soil pH level indicating acidity or alkalinity. Example: 6.8",
     )
-
     electrical_conductivity_ds_m: float = Field(
         ge=0,
         description="Electrical conductivity of the soil measured in dS/m indicating salinity. Example: 0.35",
     )
-
     organic_carbon_percent: float = Field(
         ge=0,
         le=100,
         description="Organic carbon content of soil as percentage. Example: 0.75",
     )
-
     nitrogen_kg_per_hectare: float = Field(
         ge=0,
         description="Available Nitrogen in the soil measured in kilograms per hectare. Example: 280",
     )
-
     phosphorus_kg_per_hectare: float = Field(
         ge=0,
         description="Available Phosphorus in the soil measured in kilograms per hectare. Example: 45",
     )
-
     potassium_kg_per_hectare: float = Field(
         ge=0,
         description="Available Potassium in the soil measured in kilograms per hectare. Example: 320",
     )
-
     sulphur_ppm: Optional[float] = Field(
         ge=0,
         default=None,
         description="Sulphur concentration in soil measured in parts per million. Example: 12",
     )
-
     zinc_ppm: Optional[float] = Field(
         ge=0,
         default=None,
         description="Zinc concentration in soil measured in parts per million. Example: 0.8",
     )
-
     boron_ppm: Optional[float] = Field(
         ge=0,
         default=None,
         description="Boron concentration in soil measured in parts per million. Example: 0.5",
     )
-
     iron_ppm: Optional[float] = Field(
         ge=0,
         default=None,
@@ -114,7 +102,6 @@ class CropYield(BaseModel):
     quantity: Quantity = Field(
         description="Total crop quantity harvested. Example: 20 quintal."
     )
-
     area: Area = Field(
         description="Area over which the yield was measured. Example: 1 acre."
     )
@@ -175,11 +162,9 @@ class CropSeason(StrEnum):
 
 class AgriculturalInput(BaseModel):
     category: InputCategory = Field(description="Category of agricultural input.")
-
     name: str = Field(
         description="Commercial or generic name of the agricultural input. Example: Urea"
     )
-
     quantity: Optional[Quantity] = Field(
         default=None,
         description="Quantity applied. Example: 50 kg",
@@ -192,30 +177,24 @@ class Location(BaseModel):
     lat_lng: LatLng = Field(
         description="Represents the Geographic co-ordinates of the farm"
     )
-
     village: Optional[str] = Field(
         default=None,
         description="Village or smallest local administrative region where the farm is located. Example: Mydukur",
     )
-
     mandal: Optional[str] = Field(
         default=None,
         description="Sub-district administrative unit used in some countries such as India. Example: Mydukur",
     )
-
     district: Optional[str] = Field(
         default=None,
         description="District or equivalent administrative division. Example: YSR Kadapa",
     )
-
     state: str = Field(
         description="State, province, or region where the farm is located. Example: Andhra Pradesh"
     )
-
     country: str = Field(
         default="India", description="Country where the farm is located. Example: India"
     )
-
     postal_code: str = Field(
         description="Postal or ZIP code for the farm's location. Example: 516172"
     )
@@ -225,30 +204,24 @@ class PreviousCrops(BaseModel):
     """Represents crops previously cultivated on the farm, which are not recommended and tracked oxian."""
 
     crop_name: str = Field(description="Name of the crop grown. Example: Rice")
-
     crop_variety: Optional[str] = Field(
         default=None,
         description="Variety or cultivar of the crop grown. Example: BPT 5204",
     )
-
     year: int = Field(
         description="Year in which the crop was cultivated. Example: 2024"
     )
-
     season: CropSeason = Field(
         description="Agricultural season in which the crop was cultivated. Example: Kharif"
     )
-
     crop_yield: Optional[CropYield] = Field(
         default=None,
         description="Measured crop yield expressed as quantity over a specific land area. Example: 20 quintal harvested from 1 acre.",
     )
-
     inputs_used: List[AgriculturalInput] = Field(
         default_factory=list,
         description="Structured list of agricultural inputs applied for the crop, if farmer remembers.",
     )
-
     note: str = Field(
         description=(
             "Farmer-provided observation, experience, issue, or success related to the crop. "
@@ -280,17 +253,14 @@ class FarmAsset(BaseModel):
     category: FarmAssetCategory = Field(
         description="Category of the farm asset or facility."
     )
-
     name: str = Field(
         description=(
             "Name of the asset, equipment, or setup. Example: Drip Irrigation System"
         )
     )
-
     quantity: Optional[int] = Field(
         default=None, ge=1, description="Number of such assets available on the farm."
     )
-
     description: Optional[str] = Field(
         default=None,
         description=(
@@ -299,55 +269,30 @@ class FarmAsset(BaseModel):
     )
 
 
-# Should be directly in FarmProfile in front-end definition
-class FarmProfileFields(BaseModel):
-    """Represents the core fields of a farm profile excluding metadata."""
-
-    name: str = Field(
-        description="Name or nickname used to identify the farm. Example: Green Valley Farm"
-    )
-
-    location: Location = Field(description="Geographical location details of the farm.")
+class FarmProfileInputInvariantFields(BaseModel):
+    """Farm profile input fields that do not need translation."""
 
     soil_type: SoilType = Field(
         description="Dominant soil type present in the farm. Example: Black soil"
     )
-
     total_area: Area = Field(
         description="Total land area of the farm. Example: 5 acres."
     )
-
     cultivated_area: Area = Field(
         description="Area of the farm currently used for cultivation. Example: 4 acres."
     )
-
     water_source: WaterSource = Field(
         description="Primary water source used for irrigation. Example: Borewell"
     )
-
     irrigation_system: Optional[IrrigationSystem] = Field(
         default=None,
         description="Irrigation system used for watering crops if available. Example: Drip",
     )
-
-    crops: Optional[List[PreviousCrops]] = Field(
-        default=None,
-        description="Historical list of crops previously cultivated on the farm.",
-    )
-
     soil_test_properties: Optional[SoilTestProperties] = Field(
         default=None,
         description=(
             "Detailed soil test results including nutrient levels and soil characteristics."
             "Should upload images or PDF documents of the test, extract from them."
-        ),
-    )
-
-    farm_assets: Optional[List[FarmAsset]] = Field(
-        default=None,
-        description=(
-            "List of farm infrastructure, machinery, facilities, "
-            "and operational setups available on the farm."
         ),
     )
 
@@ -363,31 +308,58 @@ class FarmProfileFields(BaseModel):
         return self
 
 
-TranslatedFarmProfileFields = TranslatedFields[FarmProfileFields]
+class FarmProfileTranslatableFields(BaseModel):
+    """Farm profile fields that can be translated."""
+
+    name: str = Field(
+        description="Name or nickname used to identify the farm. Example: Green Valley Farm"
+    )
+    location: Location = Field(description="Geographical location details of the farm.")
+    crops: Optional[List[PreviousCrops]] = Field(
+        default=None,
+        description="Historical list of crops previously cultivated on the farm.",
+    )
+    farm_assets: Optional[List[FarmAsset]] = Field(
+        default=None,
+        description=(
+            "List of farm infrastructure, machinery, facilities, "
+            "and operational setups available on the farm."
+        ),
+    )
 
 
-class FarmProfileMetadata(BaseModel):
+class FarmProfileInput(FarmProfileInputInvariantFields, FarmProfileTranslatableFields):
+    """Input payload for creating or updating a farm profile."""
+
+
+TranslatedFarmProfileFields = TranslatedFields[FarmProfileTranslatableFields]
+
+
+class TranslatedFarmProfileInput(
+    FarmProfileInputInvariantFields, TranslatedFarmProfileFields
+):
+    """Translated farm profile input including invariant fields."""
+
+
+class FarmProfileInvariantFields(FarmProfileInputInvariantFields):
     id: str = Field(
         default_factory=lambda: uuid4().hex,
         description="Unique identifier for the farm profile.",
         validation_alias=AliasChoices("id", "_id"),
         serialization_alias="_id",
     )
-
     user_id: str = Field(
         description="Unique identifier of the farmer who owns or manages the farm."
     )
-
     created_at: datetime = Field(
         default_factory=lambda: datetime.now(timezone.utc),
     )
-
     updated_at: datetime = Field(
         default_factory=lambda: datetime.now(timezone.utc),
     )
 
 
-class FarmProfile(FarmProfileMetadata, FarmProfileFields):
+class FarmProfile(FarmProfileInvariantFields, FarmProfileTranslatableFields):
     """
     Represents the complete profile of a farm including both core fields and metadata such as unique identifiers and ownership information.
     This model is used for API responses and includes all necessary information to represent a farm profile in the system.
@@ -395,7 +367,7 @@ class FarmProfile(FarmProfileMetadata, FarmProfileFields):
 
 
 # Backend only Model
-class FarmProfileDocument(FarmProfileMetadata, TranslatedFarmProfileFields):
+class FarmProfileDocument(FarmProfileInvariantFields, TranslatedFarmProfileFields):
     """
     Represents the farm profile data structure used for persistence in the database.
     This model is designed to be stored as a single document in a NoSQL database like MongoDB.
