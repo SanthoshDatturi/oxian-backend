@@ -112,6 +112,14 @@ async def get_by_id(
     return _to_farm_profile(document, language)
 
 
+async def exists_by_id(farm_id: str, user_id: str) -> bool:
+    document = await get_farm_profiles_collection().find_one(
+        {"_id": farm_id, "user_id": user_id},
+        {"_id": 1},
+    )
+    return document is not None
+
+
 async def list_by_user(
     user_id: str,
     language: PersistenceLanguage,

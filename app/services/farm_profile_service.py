@@ -40,6 +40,13 @@ async def get_farm_profile(farm_id: str, user_id: str) -> FarmProfile | None:
     )
 
 
+async def has_farm_access(farm_id: str, user_id: str) -> bool:
+    return await farm_profile_repository.exists_by_id(
+        farm_id=farm_id,
+        user_id=user_id,
+    )
+
+
 async def create_farm_profile(
     *,
     user_id: str,
