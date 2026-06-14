@@ -1,8 +1,13 @@
-from app.integrations.database.mogodb import get_intercropping_details_collection
+from app.integrations.database.mogodb import (
+    get_cultivation_crops_collection,
+    get_intercropping_details_collection,
+)
 from app.schemas.generic_types import PersistenceLanguage
 from app.schemas.intercropping_details import (
     IntercroppingDetails,
     IntercroppingDetailsDocument,
+    IntercroppingDetailsInputInvariantFields,
+    IntercroppingDetailsInvariantFields,
     IntercroppingDetailsTranslatableFields,
 )
 
@@ -11,15 +16,21 @@ def _to_intercropping_details(
     document: dict,
     language: PersistenceLanguage,
 ) -> IntercroppingDetails:
-    fields = document.get(language.value) or {}
-    data = {
-        **fields,
-        "id": document["_id"],
-        "intercrop_type": document["intercrop_type"],
-    }
-    if document.get("recommendation_id") is not None:
-        data["recommendation_id"] = document["recommendation_id"]
-    return IntercroppingDetails.model_validate(data)
+    translatable_fields = document.get(language.value) or {}
+    invariant_data = dict(document)
+    for key in IntercroppingDetailsInvariantFields.model_fields:
+        value = document.get(key, translatable_fields.get(key))
+        if value is not None:
+            invariant_data[key] = value
+    invariant_fields = IntercroppingDetailsInvariantFields.model_validate(
+        invariant_data
+    )
+    return IntercroppingDetails.model_validate(
+        {
+            **invariant_fields.model_dump(mode="json"),
+            **translatable_fields,
+        }
+    )
 
 
 async def create(
@@ -46,7 +57,10 @@ async def save_language(
     details: IntercroppingDetails,
     language: PersistenceLanguage,
 ) -> IntercroppingDetails:
-    fields = IntercroppingDetailsTranslatableFields.model_validate(
+    translatable_fields = IntercroppingDetailsTranslatableFields.model_validate(
+        details
+    ).model_dump(exclude_none=True, mode="json")
+    invariant_fields = IntercroppingDetailsInputInvariantFields.model_validate(
         details
     ).model_dump(exclude_none=True, mode="json")
     await get_intercropping_details_collection().update_one(
@@ -54,8 +68,8 @@ async def save_language(
         {
             "$set": {
                 "recommendation_id": details.recommendation_id,
-                "intercrop_type": details.intercrop_type,
-                language.value: fields,
+                **invariant_fields,
+                language.value: translatable_fields,
             },
         },
         upsert=True,
@@ -91,6 +105,16 @@ async def get_document_by_id(
     if not document:
         return None
     return IntercroppingDetailsDocument.model_validate(document)
+
+
+async def get_farm_id_by_id(intercropping_id: str) -> str | None:
+    document = await get_cultivation_crops_collection().find_one(
+        {"intercropping_id": intercropping_id},
+        {"farm_id": 1},
+    )
+    if not document:
+        return None
+    return document.get("farm_id")
 
 
 async def delete(intercropping_id: str) -> bool:

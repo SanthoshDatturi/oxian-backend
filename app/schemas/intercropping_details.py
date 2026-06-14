@@ -63,11 +63,41 @@ class IntercroppingDetailsTranslatableFields(BaseModel):
     )
 
 
-class IntercroppingDetailsInvariantFields(BaseModel):
+class IntercroppingDetailsInputInvariantFields(BaseModel):
     """
-    Metadata and operational fields for IntercroppingDetails that are not translated.
+    Intercropping details input fields that do not need translation.
     """
 
+    intercrop_type: IntercropType = Field(
+        description=(
+            "Type of intercropping system selected. Examples include row "
+            "intercropping, strip intercropping, relay intercropping, and mixed intercropping."
+        )
+    )
+
+
+class IntercroppingDetailsInput(
+    IntercroppingDetailsInputInvariantFields,
+    IntercroppingDetailsTranslatableFields,
+):
+    """Input payload for creating or updating intercropping details."""
+
+
+TranslatedIntercroppingDetailsFields = TranslatedFields[
+    IntercroppingDetailsTranslatableFields
+]
+
+
+class TranslatedIntercroppingDetailsInput(
+    IntercroppingDetailsInputInvariantFields,
+    TranslatedIntercroppingDetailsFields,
+):
+    """Translated intercropping details input including invariant fields."""
+
+
+class IntercroppingDetailsInvariantFields(
+    IntercroppingDetailsInputInvariantFields
+):
     id: str = Field(
         default_factory=lambda: uuid4().hex,
         description="Unique identifier of the intercropping system.",
@@ -81,12 +111,6 @@ class IntercroppingDetailsInvariantFields(BaseModel):
             "this intercropping system was selected. Null when created manually."
         ),
     )
-    intercrop_type: IntercropType = Field(
-        description=(
-            "Type of intercropping system selected. Examples include row "
-            "intercropping, strip intercropping, relay intercropping, and mixed intercropping."
-        )
-    )
 
 
 class IntercroppingDetails(
@@ -98,11 +122,6 @@ class IntercroppingDetails(
     Stores only the intercropping-system-specific information and does not
     duplicate cultivation crop ownership relationships.
     """
-
-
-TranslatedIntercroppingDetailsFields = TranslatedFields[
-    IntercroppingDetailsTranslatableFields
-]
 
 
 class IntercroppingDetailsDocument(

@@ -5,6 +5,8 @@ from app.schemas.cultivation_crop import (
     BaseCrop,
     CultivationCrop,
     CultivationCropDocument,
+    CultivationCropInputInvariantFields,
+    CultivationCropInvariantFields,
 )
 from app.schemas.generic_types import PersistenceLanguage
 
@@ -13,27 +15,19 @@ def _to_cultivation_crop(
     document: dict,
     language: PersistenceLanguage,
 ) -> CultivationCrop:
-    fields = document.get(language.value) or {}
-    data = {
-        **fields,
-        "id": document["_id"],
-        "farm_id": document["farm_id"],
-    }
-    crop_state = document.get("crop_state", fields.get("crop_state"))
-    selected_area = document.get("selected_area", fields.get("selected_area"))
-    if document.get("recommendation_id") is not None:
-        data["recommendation_id"] = document["recommendation_id"]
-    if document.get("intercropping_id") is not None:
-        data["intercropping_id"] = document["intercropping_id"]
-    if crop_state is not None:
-        data["crop_state"] = crop_state
-    if selected_area is not None:
-        data["selected_area"] = selected_area
-    if document.get("created_at") is not None:
-        data["created_at"] = document["created_at"]
-    if document.get("updated_at") is not None:
-        data["updated_at"] = document["updated_at"]
-    return CultivationCrop.model_validate(data)
+    translatable_fields = document.get(language.value) or {}
+    invariant_data = dict(document)
+    for key in CultivationCropInvariantFields.model_fields:
+        value = document.get(key, translatable_fields.get(key))
+        if value is not None:
+            invariant_data[key] = value
+    invariant_fields = CultivationCropInvariantFields.model_validate(invariant_data)
+    return CultivationCrop.model_validate(
+        {
+            **invariant_fields.model_dump(mode="json"),
+            **translatable_fields,
+        }
+    )
 
 
 def _touch(crop: CultivationCropDocument) -> CultivationCropDocument:
@@ -69,9 +63,12 @@ async def save_language(
     language: PersistenceLanguage,
 ) -> CultivationCrop:
     crop = crop.model_copy(update={"updated_at": datetime.now(timezone.utc)})
-    fields = BaseCrop.model_validate(crop).model_dump(
+    translatable_fields = BaseCrop.model_validate(crop).model_dump(
         exclude_none=True, mode="json"
     )
+    invariant_fields = CultivationCropInputInvariantFields.model_validate(
+        crop
+    ).model_dump(exclude_none=True, mode="json")
     await get_cultivation_crops_collection().update_one(
         {"_id": crop.id, "farm_id": crop.farm_id},
         {
@@ -79,10 +76,9 @@ async def save_language(
                 "farm_id": crop.farm_id,
                 "recommendation_id": crop.recommendation_id,
                 "intercropping_id": crop.intercropping_id,
-                "crop_state": crop.crop_state,
-                "selected_area": crop.selected_area.model_dump(mode="json"),
+                **invariant_fields,
                 "updated_at": crop.updated_at,
-                language.value: fields,
+                language.value: translatable_fields,
             },
             "$setOnInsert": {"created_at": crop.created_at},
         },
@@ -127,6 +123,16 @@ async def get_document_by_id(
     if not document:
         return None
     return CultivationCropDocument.model_validate(document)
+
+
+async def get_farm_id_by_id(crop_id: str) -> str | None:
+    document = await get_cultivation_crops_collection().find_one(
+        {"_id": crop_id},
+        {"farm_id": 1},
+    )
+    if not document:
+        return None
+    return document.get("farm_id")
 
 
 async def list_by_farm(
@@ -179,6 +185,25 @@ async def list_by_intercropping(
     return [_to_cultivation_crop(document, language) async for document in cursor]
 
 
+async def list_documents_by_intercropping(
+    intercropping_id: str,
+    farm_id: str | None = None,
+    limit: int = 100,
+) -> list[CultivationCropDocument]:
+    query: dict[str, str] = {"intercropping_id": intercropping_id}
+    if farm_id:
+        query["farm_id"] = farm_id
+    cursor = (
+        get_cultivation_crops_collection()
+        .find(query)
+        .sort("created_at", -1)
+        .limit(limit)
+    )
+    return [
+        CultivationCropDocument.model_validate(document) async for document in cursor
+    ]
+
+
 async def delete(crop_id: str, farm_id: str | None = None) -> bool:
     query: dict[str, str] = {"_id": crop_id}
     if farm_id:
@@ -189,4 +214,15 @@ async def delete(crop_id: str, farm_id: str | None = None) -> bool:
 
 async def delete_all_by_farm(farm_id: str) -> int:
     result = await get_cultivation_crops_collection().delete_many({"farm_id": farm_id})
+    return result.deleted_count
+
+
+async def delete_all_by_intercropping(
+    intercropping_id: str,
+    farm_id: str | None = None,
+) -> int:
+    query: dict[str, str] = {"intercropping_id": intercropping_id}
+    if farm_id:
+        query["farm_id"] = farm_id
+    result = await get_cultivation_crops_collection().delete_many(query)
     return result.deleted_count
