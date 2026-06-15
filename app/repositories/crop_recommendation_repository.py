@@ -111,6 +111,16 @@ async def get_document_by_id(
     return CropRecommendationDocument.model_validate(document)
 
 
+async def get_farm_id_by_id(recommendation_id: str) -> str | None:
+    document = await get_crop_recommendations_collection().find_one(
+        {"_id": recommendation_id},
+        {"farm_id": 1},
+    )
+    if not document:
+        return None
+    return document.get("farm_id")
+
+
 async def list_by_farm(
     farm_id: str,
     language: PersistenceLanguage,

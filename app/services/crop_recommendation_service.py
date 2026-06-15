@@ -25,8 +25,14 @@ from app.schemas.crop_recommendation import (
     CropRecommendationDocument,
     CropRecommendationFields,
     CropRecommendationRequest,
+    SelectCropRequest,
 )
-from app.schemas.generic_types import PersistenceLanguage
+from app.schemas.cultivation_crop import CropState, CultivationCropDocument
+from app.schemas.generic_types import Area, PersistenceLanguage
+from app.schemas.intercropping_details import (
+    IntercroppingDetailsDocument,
+    IntercroppingDetailsTranslatableFields,
+)
 from app.schemas.notification import (
     Destination,
     DestinationType,
@@ -37,7 +43,13 @@ from app.schemas.notification import (
     Screen,
 )
 from app.schemas.process import Process, ProcessError, State
-from app.services import crop_image_service, notification_service, translation_service
+from app.services import (
+    crop_image_service,
+    cultivation_crop_service,
+    farm_profile_service,
+    notification_service,
+    translation_service,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -457,6 +469,9 @@ async def generate_crop_recommendation(
 
     Creates a Process, enqueues the job, and awaits the result.
     """
+    if not await farm_profile_service.has_farm_access(farm_id=farm_id, user_id=user_id):
+        raise ValueError(f"Farm profile not found: farm_id={farm_id}")
+
     process = Process(status=State.PENDING)
     process = await process_repository.create(process)
 
@@ -475,23 +490,51 @@ async def generate_crop_recommendation(
 
 async def get_recommendation(
     *,
+    user_id: str,
     recommendation_id: str,
     farm_id: str | None = None,
 ) -> CropRecommendation | None:
     """Fetch a single crop recommendation in the user's language."""
-    return await crop_recommendation_repository.get_by_id(
+
+    recommendation = await crop_recommendation_repository.get_by_id(
         recommendation_id=recommendation_id,
         language=PersistenceLanguage.USER_LANGUAGE,
+        farm_id=farm_id,
+    )
+    if recommendation is None:
+        return None
+
+    if not await farm_profile_service.has_farm_access(
+        farm_id=recommendation.farm_id, user_id=user_id
+    ):
+        raise ValueError(f"Farm profile not found: farm_id={recommendation.farm_id}")
+
+    return recommendation
+
+
+async def _get_recommendation(
+    *,
+    recommendation_id: str,
+    farm_id: str | None = None,
+) -> CropRecommendation | None:
+    """Fetch a single crop recommendation in English for system interaction."""
+    return await crop_recommendation_repository.get_by_id(
+        recommendation_id=recommendation_id,
+        language=PersistenceLanguage.ENGLISH,
         farm_id=farm_id,
     )
 
 
 async def list_recommendations(
     *,
+    user_id: str,
     farm_id: str,
     limit: int = 20,
 ) -> list[CropRecommendation]:
     """List crop recommendations for a farm in the user's language, newest first."""
+    if not await farm_profile_service.has_farm_access(farm_id=farm_id, user_id=user_id):
+        return []
+
     return await crop_recommendation_repository.list_by_farm(
         farm_id=farm_id,
         language=PersistenceLanguage.USER_LANGUAGE,
@@ -501,16 +544,154 @@ async def list_recommendations(
 
 async def delete_recommendation(
     *,
+    user_id: str,
     recommendation_id: str,
     farm_id: str | None = None,
 ) -> bool:
     """Delete a single crop recommendation by ID."""
+    farm_id = farm_id or await crop_recommendation_repository.get_farm_id_by_id(
+        recommendation_id
+    )
+    if not farm_id:
+        return False
+    if not await farm_profile_service.has_farm_access(farm_id=farm_id, user_id=user_id):
+        raise ValueError(f"Farm profile not found: farm_id={farm_id}")
+
     return await crop_recommendation_repository.delete(
         recommendation_id=recommendation_id,
         farm_id=farm_id,
     )
 
 
-async def delete_all_recommendations_for_farm(farm_id: str) -> int:
+async def delete_all_recommendations_for_farm(*, user_id: str, farm_id: str) -> int:
     """Delete all crop recommendations for a farm. Returns count deleted."""
+    if not await farm_profile_service.has_farm_access(farm_id=farm_id, user_id=user_id):
+        raise ValueError(f"Farm profile not found: farm_id={farm_id}")
+
     return await crop_recommendation_repository.delete_all_by_farm(farm_id=farm_id)
+
+
+async def select_mono_crop_from_recommendation(
+    *,
+    user_id: str,
+    farm_id: str,
+    recommendation_id: str,
+    crop_id: str,
+    selected_area: Area,
+) -> CultivationCropDocument:
+    """
+    Materialize a selected monocrop candidate from a recommendation into a CultivationCrop.
+    """
+    if not await farm_profile_service.has_farm_access(
+        farm_id=farm_id,
+        user_id=user_id,
+    ):
+        raise ValueError(f"Farm profile not found: farm_id={farm_id}")
+
+    doc = await crop_recommendation_repository.get_document_by_id(
+        recommendation_id=recommendation_id,
+    )
+    if not doc:
+        raise ValueError("Recommendation not found")
+
+    # Search in mono crop candidates
+    for candidate_idx, candidate in enumerate(doc.english.mono_crop_candidates):
+        if candidate.id == crop_id:
+            user_lang_candidate = doc.user_language.mono_crop_candidates[candidate_idx]
+
+            cultivation_crop = CultivationCropDocument(
+                id=candidate.id,
+                farm_id=farm_id,
+                recommendation_id=recommendation_id,
+                intercropping_id=None,
+                crop_state=CropState.SELECTED,
+                selected_area=selected_area,
+                english=candidate,
+                user_language=user_lang_candidate,
+            )
+            saved_crop = await cultivation_crop_service._create_cultivation_crop(
+                cultivation_crop
+            )
+            return saved_crop
+
+    raise ValueError(
+        f"Mono crop candidate {crop_id} not found in recommendation {recommendation_id}"
+    )
+
+
+async def select_intercrop_from_recommendation(
+    *,
+    user_id: str,
+    farm_id: str,
+    recommendation_id: str,
+    intercrop_id: str,
+    payload: list[SelectCropRequest],
+) -> tuple[list[CultivationCropDocument], IntercroppingDetailsDocument]:
+    """
+    Materialize a selected intercrop candidate from a recommendation into CultivationCrop(s)
+    and an IntercroppingDetails document.
+    """
+    if not await farm_profile_service.has_farm_access(
+        farm_id=farm_id,
+        user_id=user_id,
+    ):
+        raise ValueError(f"Farm profile not found: farm_id={farm_id}")
+
+    doc = await crop_recommendation_repository.get_document_by_id(
+        recommendation_id=recommendation_id,
+    )
+    if not doc:
+        raise ValueError("Recommendation not found")
+
+    selected_areas = {req.crop_id: req.selected_area for req in payload}
+
+    # Search in inter crop candidates
+    for candidate_idx, candidate in enumerate(doc.english.inter_crop_candidates):
+        if candidate.id == intercrop_id:
+            user_lang_candidate = doc.user_language.inter_crop_candidates[candidate_idx]
+
+            intercropping_details = IntercroppingDetailsDocument(
+                id=candidate.id,
+                recommendation_id=recommendation_id,
+                intercrop_type=candidate.intercrop_type,
+                english=IntercroppingDetailsTranslatableFields.model_validate(
+                    candidate.model_dump()
+                ),
+                user_language=IntercroppingDetailsTranslatableFields.model_validate(
+                    user_lang_candidate.model_dump()
+                ),
+            )
+            saved_details = (
+                await cultivation_crop_service._create_intercropping_details(
+                    intercropping_details
+                )
+            )
+
+            saved_crops = []
+            for comp_idx, component in enumerate(candidate.crops):
+                user_lang_component = user_lang_candidate.crops[comp_idx]
+                area = selected_areas.get(component.id)
+                if not area:
+                    raise ValueError(f"Selected area missing for crop {component.id}")
+
+                cultivation_crop = CultivationCropDocument(
+                    id=component.id,
+                    farm_id=farm_id,
+                    recommendation_id=recommendation_id,
+                    intercropping_id=saved_details.id,
+                    crop_state=CropState.SELECTED,
+                    selected_area=area,
+                    english=component,
+                    user_language=user_lang_component,
+                )
+                saved_crops.append(
+                    await cultivation_crop_service._create_cultivation_crop(
+                        cultivation_crop
+                    )
+                )
+
+            return saved_crops, saved_details
+
+    raise ValueError(
+        f"Intercrop candidate {intercrop_id} not found in recommendation {recommendation_id}"
+    )

@@ -1,8 +1,21 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel
 
 from app.core.dependencies import authenticate_rest
-from app.schemas.crop_recommendation import CropRecommendation, CropRecommendationRequest
-from app.services import crop_recommendation_service
+from app.schemas.crop_recommendation import (
+    CropRecommendation,
+    CropRecommendationRequest,
+    SelectCropRequest,
+)
+from app.schemas.cultivation_crop import CultivationCrop
+from app.schemas.intercropping_details import IntercroppingDetails
+from app.services import crop_recommendation_service, cultivation_crop_service
+
+
+class SelectCropResponse(BaseModel):
+    crops: list[CultivationCrop]
+    intercropping_details: IntercroppingDetails | None
+
 
 router = APIRouter(prefix="/crop-recommendations", tags=["Crop Recommendations"])
 
@@ -44,8 +57,9 @@ async def list_recommendations(
     limit: int = Query(default=20, ge=1, le=100),
     user_payload: dict = Depends(authenticate_rest),
 ) -> list[CropRecommendation]:
-    _get_user_id(user_payload)
+    user_id = _get_user_id(user_payload)
     return await crop_recommendation_service.list_recommendations(
+        user_id=user_id,
         farm_id=farm_id,
         limit=limit,
     )
@@ -60,8 +74,9 @@ async def get_recommendation(
     farm_id: str | None = Query(default=None),
     user_payload: dict = Depends(authenticate_rest),
 ) -> CropRecommendation:
-    _get_user_id(user_payload)
+    user_id = _get_user_id(user_payload)
     recommendation = await crop_recommendation_service.get_recommendation(
+        user_id=user_id,
         recommendation_id=recommendation_id,
         farm_id=farm_id,
     )
@@ -76,8 +91,9 @@ async def delete_recommendation(
     farm_id: str | None = Query(default=None),
     user_payload: dict = Depends(authenticate_rest),
 ):
-    _get_user_id(user_payload)
+    user_id = _get_user_id(user_payload)
     deleted = await crop_recommendation_service.delete_recommendation(
+        user_id=user_id,
         recommendation_id=recommendation_id,
         farm_id=farm_id,
     )
@@ -91,8 +107,78 @@ async def delete_all_recommendations(
     farm_id: str,
     user_payload: dict = Depends(authenticate_rest),
 ):
-    _get_user_id(user_payload)
+    user_id = _get_user_id(user_payload)
     count = await crop_recommendation_service.delete_all_recommendations_for_farm(
+        user_id=user_id,
         farm_id=farm_id,
     )
     return {"deleted_count": count}
+
+
+@router.post(
+    "/{recommendation_id}/farms/{farm_id}/select",
+    response_model=SelectCropResponse,
+    status_code=201,
+)
+async def select_mono_crop(
+    recommendation_id: str,
+    farm_id: str,
+    payload: SelectCropRequest,
+    user_payload: dict = Depends(authenticate_rest),
+) -> SelectCropResponse:
+    user_id = _get_user_id(user_payload)
+    try:
+        crop = await crop_recommendation_service.select_mono_crop_from_recommendation(
+            user_id=user_id,
+            farm_id=farm_id,
+            recommendation_id=recommendation_id,
+            crop_id=payload.crop_id,
+            selected_area=payload.selected_area,
+        )
+        return SelectCropResponse(
+            crops=[
+                cultivation_crop_service._to_cultivation_crop(crop, crop.user_language)
+            ],
+            intercropping_details=None,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+@router.post(
+    "/{recommendation_id}/farms/{farm_id}/select/intercrop/{intercrop_id}",
+    response_model=SelectCropResponse,
+    status_code=201,
+)
+async def select_intercrop(
+    recommendation_id: str,
+    farm_id: str,
+    intercrop_id: str,
+    payload: list[SelectCropRequest],
+    user_payload: dict = Depends(authenticate_rest),
+) -> SelectCropResponse:
+    user_id = _get_user_id(user_payload)
+    try:
+        (
+            crops,
+            details,
+        ) = await crop_recommendation_service.select_intercrop_from_recommendation(
+            user_id=user_id,
+            farm_id=farm_id,
+            recommendation_id=recommendation_id,
+            intercrop_id=intercrop_id,
+            payload=payload,
+        )
+        return SelectCropResponse(
+            crops=[
+                cultivation_crop_service._to_cultivation_crop(c, c.user_language)
+                for c in crops
+            ],
+            intercropping_details=cultivation_crop_service._to_intercropping_details(
+                details, details.user_language
+            )
+            if details
+            else None,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
