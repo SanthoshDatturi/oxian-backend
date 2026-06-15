@@ -150,3 +150,15 @@ def get_cultivation_crops_collection() -> AsyncIOMotorCollection:
 
 def get_intercropping_details_collection() -> AsyncIOMotorCollection:
     return _get_collection("intercropping_details")
+
+
+def get_cultivation_tasks_collection() -> AsyncIOMotorCollection:
+    return _get_collection("cultivation_tasks")
+
+
+def get_investment_breakdowns_collection() -> AsyncIOMotorCollection:
+    return _get_collection("investment_breakdowns")
+
+
+def get_agricultural_input_recommendations_collection() -> AsyncIOMotorCollection:
+    return _get_collection("agricultural_input_recommendations")

@@ -95,9 +95,7 @@ class TranslatedIntercroppingDetailsInput(
     """Translated intercropping details input including invariant fields."""
 
 
-class IntercroppingDetailsInvariantFields(
-    IntercroppingDetailsInputInvariantFields
-):
+class IntercroppingDetailsInvariantFields(IntercroppingDetailsInputInvariantFields):
     id: str = Field(
         default_factory=lambda: uuid4().hex,
         description="Unique identifier of the intercropping system.",

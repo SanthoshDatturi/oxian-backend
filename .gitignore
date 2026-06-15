@@ -22,6 +22,7 @@ wheels/
 .cache/
 thoughts/
 grounding_metadata/
+temp/
 
 .env
 .env/
