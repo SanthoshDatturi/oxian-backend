@@ -8,6 +8,7 @@ from app.schemas.cultivation_crop import (
     IntercroppingCultivationInput,
 )
 from app.services import cultivation_crop_service
+from app.services.crop_planning_service import CropPlan, generate_crop_plan
 
 router = APIRouter(prefix="/cultivation-crops", tags=["Cultivation Crops"])
 
@@ -186,3 +187,24 @@ async def delete_intercropping_cultivation(
             detail="Intercropping cultivation not found",
         )
     return
+
+
+@router.post(
+    "/farms/{farm_id}/{crop_id}/plan",
+    response_model=CropPlan,
+    status_code=202,
+)
+async def create_crop_plan(
+    farm_id: str,
+    crop_id: str,
+    user_payload: dict = Depends(authenticate_rest),
+) -> CropPlan:
+    user_id = _get_user_id(user_payload)
+    try:
+        return await generate_crop_plan(
+            user_id=user_id,
+            farm_id=farm_id,
+            crop_id=crop_id,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))

@@ -176,6 +176,18 @@ async def get_cultivation_crop(
     )
 
 
+async def _get_cultivation_crop(
+    *,
+    farm_id: str,
+    crop_id: str,
+) -> CultivationCrop | None:
+    return await cultivation_crop_repository.get_by_id(
+        crop_id=crop_id,
+        farm_id=farm_id,
+        language=PersistenceLanguage.ENGLISH,
+    )
+
+
 async def create_cultivation_crop(
     *,
     user_id: str,
@@ -440,3 +452,12 @@ async def _create_intercropping_details(
             intercropping_details_document.recommendation_id,
         )
         raise
+
+
+async def _get_intercropping_details(
+    *,
+    intercropping_id: str,
+) -> IntercroppingDetailsDocument | None:
+    return await intercropping_details_repository.get_document_by_id(
+        intercropping_id
+    )
