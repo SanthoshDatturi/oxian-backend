@@ -34,7 +34,7 @@ from app.schemas.investment_breakdown import (
 )
 from app.schemas.process import Process, ProcessError, State
 from app.services import (
-    agricultural_input_recommendation_service,
+    agricultural_input_service,
     cultivation_crop_service,
     cultivation_task_service,
     farm_profile_service,
@@ -281,7 +281,7 @@ async def _run_job(
                             english=input_english,
                             user_language=input_user_lang,
                         )
-                        input_doc = await agricultural_input_recommendation_service._create_agricultural_input_recommendation(
+                        input_doc = await agricultural_input_service._create_agricultural_input_recommendation(
                             input_doc
                         )
                         saved_inputs.append(input_doc)
