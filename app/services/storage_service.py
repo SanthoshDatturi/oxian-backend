@@ -27,15 +27,14 @@ async def _delete_blob_if_exists(file: File) -> bool:
         return True
 
 
-async def upload_file(
-    file_stream: Union[bytes, IO[bytes]],
+async def create_upload_url(
     filename: str,
     user_id: str,
-    mime_type: str | None = None,
-) -> str:
+    mime_type: str,
+) -> tuple[str, str]:
     """
-    Public upload API. Use this at external boundaries where raw request data
-    needs to become temporary storage owned by the authenticated user.
+    Public upload API. Use this at external boundaries to generate a
+    signed URL for direct upload.
     """
     stored_file = File(
         user_id=user_id,
@@ -44,8 +43,28 @@ async def upload_file(
         status=FileStatus.TEMP,
     )
 
-    stored_file = await _upload_file(file_stream=file_stream, stored_file=stored_file)
-    return stored_file.id
+    try:
+        await files_repository.create(stored_file)
+    except Exception as exc:
+        raise StorageBackendError("Failed to persist file metadata.") from exc
+
+    try:
+        upload_url = await files.generate_upload_url(
+            file_id=stored_file.id,
+            scope=stored_file.storage_scope,
+        )
+    except Exception as exc:
+        try:
+            await files_repository.delete_many_by_ids([stored_file.id])
+        except Exception:
+            logger.exception(
+                "Failed to rollback file metadata for file_id=%s user_id=%s",
+                stored_file.id,
+                stored_file.user_id,
+            )
+        raise StorageBackendError("Failed to generate upload url.") from exc
+
+    return stored_file.id, upload_url
 
 
 async def _upload_file(
@@ -157,12 +176,25 @@ async def _activate_files(
     Private activation API for internal services.
     """
     try:
-        return await files_repository.activate_for_entity(
+        activated_files = await files_repository.activate_for_entity(
             file_ids=file_ids,
             entity=entity,
             entity_id=entity_id,
             user_id=user_id,
         )
+
+        for stored_file in activated_files:
+            try:
+                actual_content_type = await files.get_blob_content_type(
+                    file_id=stored_file.id, scope=stored_file.storage_scope
+                )
+                if actual_content_type and actual_content_type != stored_file.content_type:
+                    await files_repository.update_content_type(stored_file.id, actual_content_type)
+                    stored_file.content_type = actual_content_type
+            except Exception:
+                logger.exception("Failed to sync blob content type for file_id=%s", stored_file.id)
+
+        return activated_files
     except ValueError as exc:
         raise StorageUploadError(str(exc)) from exc
 

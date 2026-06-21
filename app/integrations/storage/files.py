@@ -9,9 +9,10 @@ from azure.core.exceptions import (
     ResourceNotFoundError,
     ServiceRequestError,
 )
-from azure.storage.blob import ContentSettings
+from datetime import datetime, timedelta, timezone
+from azure.storage.blob import generate_blob_sas, BlobSasPermissions, ContentSettings
 
-from .azure_blob_store import get_container_client
+from .azure_blob_store import get_blob_service_client, get_container_client
 from .base import StorageScope
 from .errors import (
     StorageAuthError,
@@ -117,6 +118,52 @@ async def upload(
         raise error_type("Failed to upload file.") from exc
 
 
+async def generate_upload_url(
+    file_id: str,
+    scope: StorageScope,
+    expires_in_seconds: int = 3600,
+) -> str:
+    """
+    Generates a pre-signed URL (SAS token) for uploading a file to the storage system.
+
+    Args:
+        file_id: The file id used as the blob name.
+        scope: The storage scope (user or system).
+        expires_in_seconds: How long the upload URL should be valid.
+
+    Returns:
+        The pre-signed upload URL.
+    """
+    try:
+        blob_service_client = get_blob_service_client()
+        if not blob_service_client.account_name or not blob_service_client.credential or not hasattr(blob_service_client.credential, "account_key"):
+            raise StorageBackendError("Invalid Azure storage credentials for SAS generation.")
+
+        account_name = blob_service_client.account_name
+        account_key = blob_service_client.credential.account_key
+        container_name = scope.value
+
+        # Ensure container exists
+        container_client = await get_container_client(container_name)
+        blob_client = container_client.get_blob_client(file_id)
+
+        sas_token = generate_blob_sas(
+            account_name=account_name,
+            container_name=container_name,
+            blob_name=file_id,
+            account_key=account_key,
+            permission=BlobSasPermissions(create=True, write=True),
+            expiry=datetime.now(timezone.utc) + timedelta(seconds=expires_in_seconds),
+        )
+
+        return f"{blob_client.url}?{sas_token}"
+    except ValueError as exc:
+        raise StorageBackendError("Storage configuration error.") from exc
+    except AzureError as exc:
+        error_type = _map_azure_error(exc, operation="upload")
+        raise error_type("Failed to generate upload url.") from exc
+
+
 async def download(file_id: str, scope: StorageScope) -> bytes | None:
     """
     Download a file from the storage system.
@@ -168,6 +215,16 @@ async def _blob_exists(file_id: str, scope: StorageScope) -> bool:
         return True
     except ResourceNotFoundError:
         return False
+
+
+async def get_blob_content_type(file_id: str, scope: StorageScope) -> str | None:
+    container_client = await get_container_client(scope.value)
+    blob_client = container_client.get_blob_client(file_id)
+    try:
+        props = await blob_client.get_blob_properties()
+        return props.content_settings.content_type
+    except ResourceNotFoundError:
+        return None
 
 
 async def delete_many(

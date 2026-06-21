@@ -115,6 +115,13 @@ async def activate_for_entity(
     return [refreshed_by_id[file_id] for file_id in normalized_ids]
 
 
+async def update_content_type(file_id: str, content_type: str) -> None:
+    await get_files_collection().update_one(
+        {"_id": file_id},
+        {"$set": {"content_type": content_type}},
+    )
+
+
 async def list_by_entity(entity_id: str, user_id: str) -> list[File]:
     cursor = get_files_collection().find({"entity_id": entity_id, "user_id": user_id})
     return [File.model_validate(document) async for document in cursor]
