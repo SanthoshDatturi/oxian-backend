@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
-from app.core.dependencies import authenticate_rest
+from app.core.security import authenticate_rest
 from app.integrations.storage.errors import (
     StorageAuthError,
     StorageBackendError,

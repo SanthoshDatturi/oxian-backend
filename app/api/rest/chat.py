@@ -5,7 +5,7 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 
-from app.core.dependencies import authenticate_rest
+from app.core.security import authenticate_rest
 from app.schemas.chat import Chat
 from app.schemas.message import ChatMessageInput, Message, NewChatMessageInput
 from app.services.chat_service import (

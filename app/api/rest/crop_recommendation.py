@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
-from app.core.dependencies import authenticate_rest
+from app.core.security import authenticate_rest
 from app.schemas.crop_recommendation import (
     CropRecommendation,
     CropRecommendationRequest,

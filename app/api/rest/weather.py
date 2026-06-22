@@ -3,7 +3,7 @@ import logging
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from app.core.dependencies import authenticate_rest
+from app.core.security import authenticate_rest
 from app.integrations.weather import open_weather
 from app.schemas.weather import (
     AirPollutionResponse,

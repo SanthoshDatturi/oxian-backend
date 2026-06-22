@@ -16,8 +16,8 @@ from pydantic import ValidationError
 
 from app.common_tools.weather import WEATHER_TOOLS
 from app.core.config import settings
-from app.core.process_manager import process_manager
-from app.core.simple_queue import enqueue
+from app.workers.process_manager import process_manager
+from app.workers.queue import enqueue
 from app.integrations.storage.base import StorageEntity
 from app.prompts.prompt_manager import PromptManager
 from app.repositories import (

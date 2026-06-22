@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager, suppress
 from fastapi import FastAPI
 
 from app.api.router import api_router
-from app.core.simple_queue import worker
+from app.workers.queue import worker
 from app.integrations.database.mogodb import close_mongo_client, init_mongo_client
 from app.repositories import (
     crop_image_repository,

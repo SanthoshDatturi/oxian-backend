@@ -7,7 +7,7 @@ from fastapi.responses import HTMLResponse
 from jinja2 import Environment, FileSystemLoader, StrictUndefined
 
 from app.core.config import settings
-from app.core.dependencies import authenticate_rest
+from app.core.security import authenticate_rest
 from app.integrations.storage.errors import StorageError
 from app.schemas.crop_image import CropImageFile
 from app.services import crop_image_service

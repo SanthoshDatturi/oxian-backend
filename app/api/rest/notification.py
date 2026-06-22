@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 
-from app.core.dependencies import authenticate_rest
+from app.core.security import authenticate_rest
 from app.schemas.notification import (
     DeviceRegistration,
     DeviceRegistrationInput,
