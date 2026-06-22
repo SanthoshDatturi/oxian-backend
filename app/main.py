@@ -4,18 +4,14 @@ from contextlib import asynccontextmanager, suppress
 
 from fastapi import FastAPI
 
-from app.api.rest.admin import router as admin_router
-from app.api.rest.chat import router as chat_router
-from app.api.rest.crop_recommendation import router as crop_recommendation_router
-from app.api.rest.cultivation_crop import router as cultivation_crop_router
-from app.api.rest.farm_profile import router as farm_profile_router
-from app.api.rest.files import router as files_router
-from app.api.rest.notification import router as notification_router
-from app.api.rest.user_pref import router as user_pref_router
-from app.api.rest.weather import router as weather_router
+from app.api.router import api_router
 from app.core.simple_queue import worker
 from app.integrations.database.mogodb import close_mongo_client, init_mongo_client
-from app.repositories import crop_image_repository, files_repository, notification_repository
+from app.repositories import (
+    crop_image_repository,
+    files_repository,
+    notification_repository,
+)
 from app.services import storage_service
 
 logger = logging.getLogger(__name__)
@@ -54,16 +50,10 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan)
 
+
 @app.get("/health")
 async def health_check():
     return {"status": "ok"}
 
-app.include_router(files_router)
-app.include_router(chat_router)
-app.include_router(farm_profile_router)
-app.include_router(user_pref_router)
-app.include_router(weather_router)
-app.include_router(admin_router)
-app.include_router(crop_recommendation_router)
-app.include_router(cultivation_crop_router)
-app.include_router(notification_router)
+
+app.include_router(api_router)
