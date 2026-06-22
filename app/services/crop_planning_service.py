@@ -10,11 +10,11 @@ from langchain_core.tools import tool
 from langchain_google_genai import ChatGoogleGenerativeAI
 from pydantic import BaseModel, Field
 
-from app.common_tools.weather import WEATHER_TOOLS
+from app.ai.tools.weather import WEATHER_TOOLS
 from app.core.config import settings
 from app.workers.process_manager import process_manager
 from app.workers.queue import enqueue
-from app.prompts.prompt_manager import PromptManager
+from app.ai.prompts.prompt_manager import PromptManager
 from app.repositories import (
     process_repository,
 )

@@ -5,7 +5,7 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from pydantic import BaseModel
 
 from app.core.config import settings
-from app.prompts.prompt_manager import PromptManager
+from app.ai.prompts.prompt_manager import PromptManager
 from app.repositories import user_pref_repository
 
 T = TypeVar("T", bound=BaseModel)
