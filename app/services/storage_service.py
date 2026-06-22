@@ -67,6 +67,25 @@ async def create_upload_url(
     return stored_file.id, upload_url
 
 
+async def generate_download_url(file_id: str, user_id: str) -> str:
+    """
+    Public API to generate a signed download URL. Validates ownership.
+    """
+    stored_file = await files_repository.get_by_id(file_id=file_id, user_id=user_id)
+    if stored_file is None or stored_file.status == FileStatus.DELETING:
+        raise StorageNotFoundError("File not found.")
+
+    try:
+        download_url = await files.generate_download_url(
+            file_id=stored_file.id,
+            scope=stored_file.storage_scope,
+        )
+    except Exception as exc:
+        raise StorageBackendError("Failed to generate download url.") from exc
+
+    return download_url
+
+
 async def _upload_file(
     file_stream: Union[bytes, IO[bytes]],
     stored_file: File,

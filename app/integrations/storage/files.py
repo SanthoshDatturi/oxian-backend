@@ -164,6 +164,52 @@ async def generate_upload_url(
         raise error_type("Failed to generate upload url.") from exc
 
 
+async def generate_download_url(
+    file_id: str,
+    scope: StorageScope,
+    expires_in_seconds: int = 3600,
+) -> str:
+    """
+    Generates a pre-signed URL (SAS token) for downloading a file from the storage system.
+
+    Args:
+        file_id: The file id used as the blob name.
+        scope: The storage scope (user or system).
+        expires_in_seconds: How long the download URL should be valid.
+
+    Returns:
+        The pre-signed download URL.
+    """
+    try:
+        blob_service_client = get_blob_service_client()
+        if not blob_service_client.account_name or not blob_service_client.credential or not hasattr(blob_service_client.credential, "account_key"):
+            raise StorageBackendError("Invalid Azure storage credentials for SAS generation.")
+
+        account_name = blob_service_client.account_name
+        account_key = blob_service_client.credential.account_key
+        container_name = scope.value
+
+        # Ensure container exists
+        container_client = await get_container_client(container_name)
+        blob_client = container_client.get_blob_client(file_id)
+
+        sas_token = generate_blob_sas(
+            account_name=account_name,
+            container_name=container_name,
+            blob_name=file_id,
+            account_key=account_key,
+            permission=BlobSasPermissions(read=True),
+            expiry=datetime.now(timezone.utc) + timedelta(seconds=expires_in_seconds),
+        )
+
+        return f"{blob_client.url}?{sas_token}"
+    except ValueError as exc:
+        raise StorageBackendError("Storage configuration error.") from exc
+    except AzureError as exc:
+        error_type = _map_azure_error(exc, operation="download")
+        raise error_type("Failed to generate download url.") from exc
+
+
 async def download(file_id: str, scope: StorageScope) -> bytes | None:
     """
     Download a file from the storage system.

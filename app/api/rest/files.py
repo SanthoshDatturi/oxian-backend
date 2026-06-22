@@ -6,6 +6,7 @@ from app.integrations.storage.errors import (
     StorageAuthError,
     StorageBackendError,
     StorageDeleteError,
+    StorageDownloadError,
     StorageNotFoundError,
     StorageUploadError,
 )
@@ -23,6 +24,11 @@ class FileUploadRequest(BaseModel):
 class FileUploadResponse(BaseModel):
     file_id: str
     upload_url: str
+
+
+class FileDownloadResponse(BaseModel):
+    file_id: str
+    download_url: str
 
 
 class TtsFileRequest(BaseModel):
@@ -43,7 +49,7 @@ def _raise_for_storage_error(exc: Exception):
         raise HTTPException(status_code=503, detail=detail)
     if isinstance(exc, StorageBackendError):
         raise HTTPException(status_code=503, detail=detail)
-    if isinstance(exc, (StorageUploadError, StorageDeleteError)):
+    if isinstance(exc, (StorageUploadError, StorageDeleteError, StorageDownloadError)):
         status_code = 400 if "Invalid" in detail else 502
         raise HTTPException(status_code=status_code, detail=detail)
 
@@ -80,6 +86,34 @@ async def create_upload_url(
         _raise_for_storage_error(exc)
 
     return FileUploadResponse(file_id=file_id, upload_url=upload_url)
+
+
+@router.get("/{file_id}/url", response_model=FileDownloadResponse)
+async def get_download_url(
+    file_id: str,
+    user_payload: dict = Depends(authenticate_rest),
+) -> FileDownloadResponse:
+    """
+    Generates a pre-signed URL to download a file directly from storage.
+    """
+    user_id = user_payload.get("uid") or user_payload.get("sub")
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Invalid authentication token")
+
+    try:
+        download_url = await storage_service.generate_download_url(
+            file_id=file_id,
+            user_id=user_id,
+        )
+    except (
+        StorageDownloadError,
+        StorageAuthError,
+        StorageBackendError,
+        StorageNotFoundError,
+    ) as exc:
+        _raise_for_storage_error(exc)
+
+    return FileDownloadResponse(file_id=file_id, download_url=download_url)
 
 
 @router.delete("/", status_code=204)
