@@ -772,6 +772,17 @@ async def get_chat_by_id(*, user_id: str, chat_id: str) -> Chat | None:
     return await chat_repository.get_by_id(chat_id, user_id=user_id)
 
 
+async def get_message(*, user_id: str, message_id: str) -> Message | None:
+    message = await message_repository.get_by_id(message_id)
+    if message is None or message.user_id != user_id:
+        return None
+    return message
+
+
+async def save_message(message: Message) -> Message:
+    return await message_repository.save(message)
+
+
 async def list_chat_messages(
     *,
     user_id: str,
