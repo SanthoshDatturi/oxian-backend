@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from app.infrastructure.database.mogodb import get_investment_breakdowns_collection
+from app.infrastructure.database.collections import get_investment_breakdowns_collection
 from app.schemas.generic_types import PersistenceLanguage
 from app.schemas.investment_breakdown import (
     InvestmentBreakdown,

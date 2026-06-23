@@ -1,6 +1,6 @@
 from pymongo import DESCENDING
 
-from app.infrastructure.database.mogodb import get_crop_image_generate_requests_collection
+from app.infrastructure.database.collections import get_crop_image_generate_requests_collection
 from app.schemas.crop_image_generate_request import CropImageGenerateRequest
 
 

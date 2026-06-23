@@ -5,7 +5,7 @@ from pymongo import ASCENDING, TEXT, ReturnDocument
 from pymongo.errors import OperationFailure
 
 from app.core.config import settings
-from app.infrastructure.database.mogodb import get_crop_images_collection
+from app.infrastructure.database.collections import get_crop_images_collection
 from app.schemas.crop_image import CropImageFile, RetrievedCropImageFile
 
 EMBEDDING_VECTOR_INDEX_NAME = "crop_image_embedding_vector_index"

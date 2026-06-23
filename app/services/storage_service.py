@@ -3,8 +3,8 @@ import time
 from collections import defaultdict
 from typing import IO, Union
 
-from app.infrastructure.storage import files
-from app.infrastructure.storage.base import StorageEntity, StorageScope
+from app.infrastructure.storage import operations as files
+from app.infrastructure.storage.enums import StorageEntity, StorageScope
 from app.infrastructure.storage.errors import (
     StorageBackendError,
     StorageDeleteError,

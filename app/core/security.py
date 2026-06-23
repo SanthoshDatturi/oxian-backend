@@ -1,13 +1,13 @@
 from fastapi import Depends, HTTPException, WebSocket
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
-from app.infrastructure.auth.errors import (
+from app.infrastructure.auth import (
     AuthProviderError,
     ExpiredTokenError,
     InvalidTokenError,
     RevokedTokenError,
+    verify_token,
 )
-from app.infrastructure.auth.provider import auth_provider
 
 _bearer_scheme = HTTPBearer(auto_error=False)
 
@@ -27,7 +27,7 @@ async def _verify_token(token: str) -> dict:
         raise HTTPException(status_code=401, detail="Missing authentication token")
 
     try:
-        return await auth_provider.verify_token(token)
+        return await verify_token(token)
 
     except InvalidTokenError:
         raise HTTPException(status_code=401, detail="Invalid token")

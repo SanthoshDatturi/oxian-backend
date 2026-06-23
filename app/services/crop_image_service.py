@@ -4,8 +4,8 @@ from typing import IO, Union
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
 
 from app.core.config import settings
-from app.infrastructure.storage import files
-from app.infrastructure.storage.base import StorageScope
+from app.infrastructure.storage import operations as files
+from app.infrastructure.storage.enums import StorageScope
 from app.infrastructure.storage.errors import StorageError
 from app.repositories import (
     crop_image_generate_request_repository,

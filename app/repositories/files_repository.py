@@ -1,8 +1,8 @@
 from pymongo import ASCENDING
 from pymongo import ReturnDocument
 
-from app.infrastructure.database.mogodb import get_files_collection
-from app.infrastructure.storage.base import StorageEntity
+from app.infrastructure.database.collections import get_files_collection
+from app.infrastructure.storage.enums import StorageEntity
 from app.schemas.file import File, FileStatus
 
 

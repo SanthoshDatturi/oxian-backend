@@ -5,7 +5,7 @@ from typing import Any
 from fastapi.concurrency import run_in_threadpool
 from firebase_admin import messaging
 
-from app.infrastructure.firebase_config import initialize_firebase
+from app.infrastructure.providers.firebase import initialize_firebase
 from app.schemas.notification import (
     AndroidPriority,
     ApnsSound,
@@ -117,54 +117,49 @@ def _build_apns_config(request: NotificationRequest) -> messaging.APNSConfig | N
     )
 
 
-class FirebaseNotificationProvider:
-    async def send_to_tokens(
-        self,
-        request: NotificationRequest,
-        tokens: list[str],
-    ) -> messaging.BatchResponse:
-        if not tokens:
-            raise NotificationProviderError("At least one device token is required.")
+async def send_to_tokens(
+    request: NotificationRequest,
+    tokens: list[str],
+) -> messaging.BatchResponse:
+    if not tokens:
+        raise NotificationProviderError("At least one device token is required.")
 
-        app = initialize_firebase()
-        multicast_message = messaging.MulticastMessage(
-            tokens=tokens,
-            data=_build_data(request) or None,
-            notification=_build_notification(request),
-            android=_build_android_config(request),
-            apns=_build_apns_config(request),
+    app = initialize_firebase()
+    multicast_message = messaging.MulticastMessage(
+        tokens=tokens,
+        data=_build_data(request) or None,
+        notification=_build_notification(request),
+        android=_build_android_config(request),
+        apns=_build_apns_config(request),
+    )
+
+    try:
+        return await run_in_threadpool(
+            messaging.send_each_for_multicast,
+            multicast_message,
+            False,
+            app,
         )
-
-        try:
-            return await run_in_threadpool(
-                messaging.send_each_for_multicast,
-                multicast_message,
-                False,
-                app,
-            )
-        except Exception as exc:
-            raise NotificationProviderError("Failed to send push notification.") from exc
-
-    async def send_to_topic(
-        self,
-        request: NotificationRequest,
-    ) -> str:
-        if not request.target.topic:
-            raise NotificationProviderError("A topic name is required.")
-
-        app = initialize_firebase()
-        message = messaging.Message(
-            topic=request.target.topic,
-            data=_build_data(request) or None,
-            notification=_build_notification(request),
-            android=_build_android_config(request),
-            apns=_build_apns_config(request),
-        )
-
-        try:
-            return await run_in_threadpool(messaging.send, message, False, app)
-        except Exception as exc:
-            raise NotificationProviderError("Failed to send push notification.") from exc
+    except Exception as exc:
+        raise NotificationProviderError("Failed to send push notification.") from exc
 
 
-notification_provider = FirebaseNotificationProvider()
+async def send_to_topic(
+    request: NotificationRequest,
+) -> str:
+    if not request.target.topic:
+        raise NotificationProviderError("A topic name is required.")
+
+    app = initialize_firebase()
+    message = messaging.Message(
+        topic=request.target.topic,
+        data=_build_data(request) or None,
+        notification=_build_notification(request),
+        android=_build_android_config(request),
+        apns=_build_apns_config(request),
+    )
+
+    try:
+        return await run_in_threadpool(messaging.send, message, False, app)
+    except Exception as exc:
+        raise NotificationProviderError("Failed to send push notification.") from exc

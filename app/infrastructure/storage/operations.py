@@ -12,8 +12,8 @@ from azure.core.exceptions import (
 from datetime import datetime, timedelta, timezone
 from azure.storage.blob import generate_blob_sas, BlobSasPermissions, ContentSettings
 
-from .azure_blob_store import get_blob_service_client, get_container_client
-from .base import StorageScope
+from app.infrastructure.providers.azure_blob import get_blob_service_client, get_container_client
+from .enums import StorageScope
 from .errors import (
     StorageAuthError,
     StorageBackendError,

@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from app.infrastructure.database.mogodb import get_cultivation_crops_collection
+from app.infrastructure.database.collections import get_cultivation_crops_collection
 from app.schemas.cultivation_crop import (
     BaseCrop,
     CultivationCrop,

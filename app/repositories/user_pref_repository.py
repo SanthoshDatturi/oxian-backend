@@ -1,6 +1,6 @@
 import time
 
-from app.infrastructure.database.mogodb import get_user_prefs_collection
+from app.infrastructure.database.collections import get_user_prefs_collection
 from app.schemas.user_pref import UserPreference
 
 

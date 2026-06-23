@@ -3,7 +3,7 @@ import sys
 
 from firebase_admin import auth
 
-from app.infrastructure.firebase_config import initialize_firebase
+from app.infrastructure.providers.firebase import initialize_firebase
 
 
 def make_admin(email: str) -> None:

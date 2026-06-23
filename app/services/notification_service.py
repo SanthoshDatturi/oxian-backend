@@ -4,9 +4,10 @@ from datetime import datetime, timezone
 from firebase_admin import exceptions as firebase_exceptions
 from firebase_admin import messaging
 
-from app.infrastructure.notifications.provider import (
+from app.infrastructure.notifications import (
     NotificationProviderError,
-    notification_provider,
+    send_to_topic,
+    send_to_tokens,
 )
 from app.repositories import notification_repository
 from app.schemas.notification import (
@@ -113,7 +114,7 @@ async def send_notification(request: NotificationRequest) -> NotificationRecord 
         raise ValueError("Notification content is required.")
 
     if request.target.type == NotificationTargetType.TOPIC:
-        await notification_provider.send_to_topic(request)
+        await send_to_topic(request)
         return None
 
     if request.target.user_id is None:
@@ -135,7 +136,7 @@ async def send_notification(request: NotificationRequest) -> NotificationRecord 
         )
 
     try:
-        response = await notification_provider.send_to_tokens(request, tokens)
+        response = await send_to_tokens(request, tokens)
     except NotificationProviderError:
         logger.exception("Push notification delivery failed for user_id=%s", user_id)
         return await _create_notification_record(

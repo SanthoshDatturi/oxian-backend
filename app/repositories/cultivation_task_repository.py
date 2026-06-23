@@ -1,4 +1,4 @@
-from app.infrastructure.database.mogodb import get_cultivation_tasks_collection
+from app.infrastructure.database.collections import get_cultivation_tasks_collection
 from app.schemas.cultivation_task import (
     CultivationTask,
     CultivationTaskDocument,

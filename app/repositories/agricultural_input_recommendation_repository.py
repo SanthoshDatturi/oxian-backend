@@ -1,4 +1,4 @@
-from app.infrastructure.database.mogodb import (
+from app.infrastructure.database.collections import (
     get_agricultural_input_recommendations_collection,
 )
 from app.schemas.agricultural_input_plan import AgriculturalInputInvariantFields

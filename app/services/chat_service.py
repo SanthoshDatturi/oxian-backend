@@ -18,7 +18,7 @@ from app.ai.tools.weather import WEATHER_TOOLS
 from app.core.config import settings
 from app.workers.process_manager import process_manager
 from app.workers.queue import enqueue
-from app.infrastructure.storage.base import StorageEntity
+from app.infrastructure.storage.enums import StorageEntity
 from app.ai.prompts.prompt_manager import PromptManager
 from app.repositories import (
     chat_repository,

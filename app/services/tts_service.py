@@ -4,10 +4,9 @@ from enum import StrEnum
 from langchain_google_genai import ChatGoogleGenerativeAI
 
 from app.core.config import settings
-from app.infrastructure.storage import files
-from app.infrastructure.storage.base import StorageEntity, StorageScope
+from app.infrastructure.storage.enums import StorageEntity, StorageScope
 from app.infrastructure.storage.errors import StorageBackendError, StorageUploadError
-from app.repositories import files_repository, message_repository
+from app.repositories import message_repository
 from app.schemas.file import File, FileStatus
 from app.schemas.message import FileMediaKind, FilePart, Message, TextPart
 from app.services import storage_service
@@ -96,28 +95,10 @@ async def generate_tts_file(
         status=FileStatus.ACTIVE,
     )
 
-    await files.upload(
+    await storage_service._upload_file(
         file_stream=audio_bytes,
-        file_id=stored_file.id,
-        scope=stored_file.storage_scope,
-        mime_type=stored_file.content_type,
+        stored_file=stored_file,
     )
-
-    try:
-        await files_repository.save_active_file(stored_file, entity=storage_entity)
-    except Exception as exc:
-        try:
-            await files.delete(scope=stored_file.storage_scope, file_id=stored_file.id)
-        except Exception:
-            logger.exception(
-                "Failed to rollback TTS blob for file_id=%s user_id=%s",
-                stored_file.id,
-                user_id,
-            )
-
-        if isinstance(exc, ValueError):
-            raise exc
-        raise StorageBackendError("Failed to persist TTS file metadata.") from exc
 
     if mode == TtsMode.MESSAGE:
         message.parts.append(
