@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from firebase_admin import exceptions as firebase_exceptions
 from firebase_admin import messaging
 
-from app.integrations.notifications.provider import (
+from app.infrastructure.notifications.provider import (
     NotificationProviderError,
     notification_provider,
 )

@@ -6,7 +6,7 @@ from fastapi.templating import Jinja2Templates
 
 from app.core.config import settings
 from app.core.security import authenticate_rest
-from app.integrations.storage.errors import StorageError
+from app.infrastructure.storage.errors import StorageError
 from app.schemas.crop_image import CropImageFile
 from app.services import crop_image_service
 

@@ -6,7 +6,7 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
 from app.api.router import api_router
-from app.integrations.database.mogodb import close_mongo_client, init_mongo_client
+from app.infrastructure.database.mogodb import close_mongo_client, init_mongo_client
 from app.repositories import (
     crop_image_repository,
     files_repository,

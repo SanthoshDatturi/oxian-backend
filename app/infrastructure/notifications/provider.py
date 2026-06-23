@@ -5,7 +5,7 @@ from typing import Any
 from fastapi.concurrency import run_in_threadpool
 from firebase_admin import messaging
 
-from app.integrations.firebase_config import initialize_firebase
+from app.infrastructure.firebase_config import initialize_firebase
 from app.schemas.notification import (
     AndroidPriority,
     ApnsSound,

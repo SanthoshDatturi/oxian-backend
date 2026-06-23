@@ -2,7 +2,7 @@ from typing import Any
 
 from pymongo import ASCENDING, DESCENDING
 
-from app.integrations.database.mogodb import (
+from app.infrastructure.database.mogodb import (
     get_device_registrations_collection,
     get_notification_records_collection,
 )

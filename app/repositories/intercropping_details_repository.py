@@ -1,4 +1,4 @@
-from app.integrations.database.mogodb import (
+from app.infrastructure.database.mogodb import (
     get_cultivation_crops_collection,
     get_intercropping_details_collection,
 )

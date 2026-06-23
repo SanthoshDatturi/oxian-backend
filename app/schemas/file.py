@@ -5,7 +5,7 @@ from uuid import uuid4
 
 from pydantic import AliasChoices, BaseModel, Field
 
-from app.integrations.storage.base import StorageScope
+from app.infrastructure.storage.base import StorageScope
 
 
 class FileStatus(StrEnum):

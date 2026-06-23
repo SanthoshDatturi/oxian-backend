@@ -3,9 +3,9 @@ import time
 from collections import defaultdict
 from typing import IO, Union
 
-from app.integrations.storage import files
-from app.integrations.storage.base import StorageEntity, StorageScope
-from app.integrations.storage.errors import (
+from app.infrastructure.storage import files
+from app.infrastructure.storage.base import StorageEntity, StorageScope
+from app.infrastructure.storage.errors import (
     StorageBackendError,
     StorageDeleteError,
     StorageNotFoundError,

@@ -4,9 +4,9 @@ from enum import StrEnum
 from langchain_google_genai import ChatGoogleGenerativeAI
 
 from app.core.config import settings
-from app.integrations.storage import files
-from app.integrations.storage.base import StorageEntity, StorageScope
-from app.integrations.storage.errors import StorageBackendError, StorageUploadError
+from app.infrastructure.storage import files
+from app.infrastructure.storage.base import StorageEntity, StorageScope
+from app.infrastructure.storage.errors import StorageBackendError, StorageUploadError
 from app.repositories import files_repository, message_repository
 from app.schemas.file import File, FileStatus
 from app.schemas.message import FileMediaKind, FilePart, Message, TextPart

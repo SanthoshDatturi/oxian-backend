@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from app.integrations.database.mogodb import get_messages_collection
+from app.infrastructure.database.mogodb import get_messages_collection
 from app.schemas.message import Message
 
 

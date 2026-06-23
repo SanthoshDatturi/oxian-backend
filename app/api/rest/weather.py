@@ -4,7 +4,7 @@ import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.core.security import authenticate_rest
-from app.integrations.weather import open_weather
+from app.infrastructure.weather import open_weather
 from app.schemas.weather import (
     AirPollutionResponse,
     CurrentWeatherResponse,

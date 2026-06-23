@@ -2,7 +2,7 @@ from typing import Any
 
 from langchain_core.tools import tool
 
-from app.integrations.weather import open_weather
+from app.infrastructure.weather import open_weather
 
 
 @tool

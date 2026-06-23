@@ -1,13 +1,13 @@
 from fastapi import Depends, HTTPException, WebSocket
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
-from app.integrations.auth.errors import (
+from app.infrastructure.auth.errors import (
     AuthProviderError,
     ExpiredTokenError,
     InvalidTokenError,
     RevokedTokenError,
 )
-from app.integrations.auth.provider import auth_provider
+from app.infrastructure.auth.provider import auth_provider
 
 _bearer_scheme = HTTPBearer(auto_error=False)
 

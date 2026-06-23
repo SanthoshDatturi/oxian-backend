@@ -4,7 +4,7 @@ from fastapi.concurrency import run_in_threadpool
 from firebase_admin import auth
 from firebase_admin import exceptions as firebase_exceptions
 
-from app.integrations.firebase_config import initialize_firebase
+from app.infrastructure.firebase_config import initialize_firebase
 
 from .base import AuthProvider
 from .errors import (

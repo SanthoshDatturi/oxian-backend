@@ -1,6 +1,6 @@
 import time
 
-from app.integrations.database.mogodb import get_chats_collection
+from app.infrastructure.database.mogodb import get_chats_collection
 from app.schemas.chat import Chat
 
 
