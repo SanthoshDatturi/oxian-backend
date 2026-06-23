@@ -3,9 +3,9 @@ import logging
 from contextlib import asynccontextmanager, suppress
 
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
 
 from app.api.router import api_router
-from app.workers.queue import worker
 from app.integrations.database.mogodb import close_mongo_client, init_mongo_client
 from app.repositories import (
     crop_image_repository,
@@ -13,6 +13,7 @@ from app.repositories import (
     notification_repository,
 )
 from app.services import storage_service
+from app.workers.queue import worker
 
 logger = logging.getLogger(__name__)
 
@@ -49,6 +50,8 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(lifespan=lifespan)
+
+app.mount("/static", StaticFiles(directory="app/static"), name="static")
 
 
 @app.get("/health")

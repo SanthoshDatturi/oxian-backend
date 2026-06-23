@@ -1,10 +1,8 @@
 import json
-from pathlib import Path
-from typing import Any
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import HTMLResponse
-from jinja2 import Environment, FileSystemLoader, StrictUndefined
+from fastapi.templating import Jinja2Templates
 
 from app.core.config import settings
 from app.core.security import authenticate_rest
@@ -14,15 +12,7 @@ from app.services import crop_image_service
 
 router = APIRouter(prefix="/admin", tags=["Admin"])
 
-_templates = Environment(
-    loader=FileSystemLoader(Path(__file__).parent.parent.parent / "templates"),
-    undefined=StrictUndefined,
-)
-
-
-def _render_template(template_name: str, **context: Any) -> HTMLResponse:
-    template = _templates.get_template(template_name)
-    return HTMLResponse(template.render(**context))
+templates = Jinja2Templates(directory="app/templates/admin")
 
 
 def _firebase_web_config() -> dict[str, str | None]:
@@ -64,13 +54,21 @@ async def require_admin(
 
 
 @router.get("/login", response_class=HTMLResponse)
-async def login_page() -> HTMLResponse:
-    return _render_template("admin_login.html", **_firebase_template_context())
+async def login_page(request: Request) -> HTMLResponse:
+    return templates.TemplateResponse(
+        request=request,
+        name="login.html",
+        context=_firebase_template_context(),
+    )
 
 
 @router.get("/crop-images", response_class=HTMLResponse)
-async def crop_image_upload_page() -> HTMLResponse:
-    return _render_template("admin_crop_images.html", **_firebase_template_context())
+async def crop_image_upload_page(request: Request) -> HTMLResponse:
+    return templates.TemplateResponse(
+        request=request,
+        name="crop_images.html",
+        context=_firebase_template_context(),
+    )
 
 
 @router.post("/crop-images", response_model=CropImageFile, status_code=201)
