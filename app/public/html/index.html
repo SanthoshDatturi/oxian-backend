@@ -1,0 +1,1584 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Oxian — AI-Powered Farming Intelligence</title>
+  <meta name="description"
+    content="Oxian is an AI-powered agricultural assistant that helps farmers with smart crop recommendations, real-time weather insights, cultivation planning, and multilingual chat." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Anek+Telugu:wght@400;600&family=Hind:wght@400;600&family=Anek+Kannada:wght@400;600&family=JetBrains+Mono:wght@400;500&display=swap"
+    rel="stylesheet" />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap"
+    rel="stylesheet" />
+  <style>
+    /* ═══════════════════════════════════════════
+       Tokens
+    ═══════════════════════════════════════════ */
+    :root {
+      --bg: #050a08;
+      --bg-alt: #0a1410;
+      --bg-card: rgba(16, 32, 24, 0.50);
+      --border: rgba(46, 120, 76, 0.16);
+      --border-glow: rgba(46, 180, 96, 0.30);
+
+      --text: #e8f5ec;
+      --text-sub: #8fa898;
+      --text-muted: #5a7a66;
+
+      --accent: #22c55e;
+      --accent-dim: #16a34a;
+      --accent-glow: rgba(34, 197, 94, 0.12);
+      --accent-bright: #4ade80;
+
+      --grad-hero: linear-gradient(135deg, #050a08 0%, #0d1f15 40%, #0a1a10 100%);
+      --grad-accent: linear-gradient(135deg, #16a34a, #22c55e, #4ade80);
+      --grad-text: linear-gradient(135deg, #e8f5ec 0%, #22c55e 50%, #4ade80 100%);
+      --grad-card: linear-gradient(145deg, rgba(16, 32, 24, 0.6), rgba(10, 20, 16, 0.35));
+
+      --r-sm: 8px;
+      --r-md: 14px;
+      --r-lg: 22px;
+      --r-xl: 32px;
+      --font: 'Inter', 'Anek Telugu', 'Hind', 'Anek Kannada', ui-sans-serif, system-ui, -apple-system, sans-serif;
+      --mono: 'Cascadia Code', 'JetBrains Mono', ui-monospace, monospace;
+    }
+
+    /* ═══════════════════════════════════════════
+       Reset
+    ═══════════════════════════════════════════ */
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html {
+      scroll-behavior: smooth;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    body {
+      font-family: var(--font);
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      overflow-x: hidden;
+    }
+
+    a {
+      color: var(--accent);
+      text-decoration: none;
+      transition: color .2s;
+    }
+
+    a:hover {
+      color: var(--accent-bright);
+    }
+
+    /* ═══════════════════════════════════════════
+       Particles
+    ═══════════════════════════════════════════ */
+    #particles-canvas {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      pointer-events: none;
+    }
+
+
+
+    /* ═══════════════════════════════════════════
+       Hero
+    ═══════════════════════════════════════════ */
+    .hero {
+      position: relative;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--grad-hero);
+      overflow: hidden;
+      padding: 80px clamp(20px, 5vw, 64px);
+    }
+
+    .hero::before {
+      content: '';
+      position: absolute;
+      top: -50%;
+      left: -20%;
+      width: 70vw;
+      height: 70vw;
+      background: radial-gradient(circle, rgba(34, 197, 94, .06) 0%, transparent 70%);
+      animation: heroGlow 8s ease-in-out infinite alternate;
+    }
+
+    .hero::after {
+      content: '';
+      position: absolute;
+      bottom: -30%;
+      right: -10%;
+      width: 50vw;
+      height: 50vw;
+      background: radial-gradient(circle, rgba(22, 163, 74, .04) 0%, transparent 60%);
+      animation: heroGlow 10s ease-in-out infinite alternate-reverse;
+    }
+
+    @keyframes heroGlow {
+      0% {
+        transform: translate(0, 0) scale(1);
+      }
+
+      100% {
+        transform: translate(30px, -20px) scale(1.1);
+      }
+    }
+
+    .hero-content {
+      position: relative;
+      z-index: 2;
+      max-width: 840px;
+      text-align: center;
+    }
+
+    .hero-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 16px 6px 8px;
+      background: var(--accent-glow);
+      border: 1px solid rgba(34, 197, 94, .2);
+      border-radius: 100px;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--accent-bright);
+      margin-bottom: 28px;
+      animation: fadeInUp .6s ease-out;
+    }
+
+    .hero-badge .dot {
+      width: 8px;
+      height: 8px;
+      background: var(--accent);
+      border-radius: 50%;
+      animation: pulse 2s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+
+      0%,
+      100% {
+        opacity: 1;
+        transform: scale(1);
+      }
+
+      50% {
+        opacity: .5;
+        transform: scale(.8);
+      }
+    }
+
+    .hero h1 {
+      font-size: clamp(40px, 7vw, 76px);
+      font-weight: 900;
+      line-height: 1.05;
+      letter-spacing: -2px;
+      margin-bottom: 24px;
+      animation: fadeInUp .8s ease-out .1s both;
+    }
+
+    .hero h1 .gradient-text {
+      background: var(--grad-text);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .hero-subtitle {
+      font-size: clamp(16px, 2.2vw, 20px);
+      color: var(--text-sub);
+      line-height: 1.6;
+      max-width: 620px;
+      margin: 0 auto 40px;
+      animation: fadeInUp .8s ease-out .2s both;
+    }
+
+    .hero-actions {
+      display: flex;
+      justify-content: center;
+      gap: 16px;
+      flex-wrap: wrap;
+      animation: fadeInUp .8s ease-out .3s both;
+    }
+
+    /* ═══════════════════════════════════════════
+       Material Symbols helper
+    ═══════════════════════════════════════════ */
+    .mi {
+      font-family: 'Material Symbols Outlined';
+      font-weight: normal;
+      font-style: normal;
+      font-size: 24px;
+      line-height: 1;
+      letter-spacing: normal;
+      text-transform: none;
+      display: inline-block;
+      white-space: nowrap;
+      word-wrap: normal;
+      direction: ltr;
+      -webkit-font-smoothing: antialiased;
+      font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+    }
+
+    .mi.filled {
+      font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+    }
+
+    /* ═══════════════════════════════════════════
+       Buttons
+    ═══════════════════════════════════════════ */
+    .btn-primary {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 16px 32px;
+      font-size: 16px;
+      font-weight: 700;
+      font-family: var(--font);
+      color: #050a08;
+      background: var(--grad-accent);
+      border: none;
+      border-radius: var(--r-md);
+      cursor: pointer;
+      transition: transform .2s, box-shadow .3s;
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 40px rgba(34, 197, 94, .35);
+    }
+
+    .btn-secondary {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 16px 32px;
+      font-size: 16px;
+      font-weight: 600;
+      font-family: var(--font);
+      color: var(--text);
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: var(--r-md);
+      cursor: pointer;
+      transition: border-color .3s, background .3s, transform .2s;
+    }
+
+    .btn-secondary:hover {
+      border-color: var(--accent);
+      background: var(--accent-glow);
+      transform: translateY(-2px);
+    }
+
+    /* ═══════════════════════════════════════════
+       Flow Connector — the vertical journey line
+    ═══════════════════════════════════════════ */
+    .journey {
+      position: relative;
+      z-index: 1;
+    }
+
+    .journey::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      left: 50%;
+      width: 2px;
+      background: linear-gradient(180deg,
+          transparent 0%,
+          var(--border-glow) 5%,
+          var(--border-glow) 95%,
+          transparent 100%);
+      transform: translateX(-50%);
+    }
+
+    /* ═══════════════════════════════════════════
+       Flow Step — alternating left / right
+    ═══════════════════════════════════════════ */
+    .flow-step {
+      position: relative;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 80px clamp(20px, 5vw, 64px);
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 64px;
+      align-items: center;
+    }
+
+    /* Connector node on the center line */
+    .flow-step::before {
+      content: attr(data-step);
+      position: absolute;
+      left: 50%;
+      top: 80px;
+      transform: translateX(-50%);
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      font-size: 18px;
+      font-weight: 800;
+      color: var(--accent);
+      background: var(--bg);
+      border: 2px solid var(--accent-dim);
+      box-shadow: 0 0 24px rgba(34, 197, 94, .15);
+      z-index: 2;
+    }
+
+    .flow-step.reverse .flow-text {
+      order: 2;
+    }
+
+    .flow-step.reverse .flow-visual {
+      order: 1;
+    }
+
+    .flow-text {
+      padding: 0 12px;
+    }
+
+    .flow-label {
+      display: inline-block;
+      font-family: var(--mono);
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 14px;
+    }
+
+    .flow-title {
+      font-size: clamp(24px, 3vw, 36px);
+      font-weight: 800;
+      line-height: 1.15;
+      letter-spacing: -.5px;
+      margin-bottom: 16px;
+    }
+
+    .flow-desc {
+      font-size: 16px;
+      color: var(--text-sub);
+      line-height: 1.65;
+      margin-bottom: 24px;
+    }
+
+    .flow-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .flow-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 7px 14px;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-sub);
+      background: rgba(34, 197, 94, .06);
+      border: 1px solid rgba(34, 197, 94, .12);
+      border-radius: 100px;
+    }
+
+    .flow-tag .tag-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--accent);
+    }
+
+    /* ═══════════════════════════════════════════
+       Flow Visuals — chat / cards / code
+    ═══════════════════════════════════════════ */
+    .flow-visual {
+      position: relative;
+      padding: 0 12px;
+    }
+
+    .visual-pane {
+      background: var(--grad-card);
+      border: 1px solid var(--border);
+      border-radius: var(--r-xl);
+      padding: 32px;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .visual-pane::after {
+      content: '';
+      position: absolute;
+      top: -40%;
+      right: -40%;
+      width: 80%;
+      height: 80%;
+      background: radial-gradient(circle, rgba(34, 197, 94, .04) 0%, transparent 70%);
+      pointer-events: none;
+    }
+
+    /* ── Chat mockup ── */
+    .chat-mock {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .chat-bubble {
+      max-width: 80%;
+      padding: 14px 18px;
+      border-radius: 16px;
+      font-size: 14px;
+      line-height: 1.5;
+      animation: fadeInUp .5s ease-out both;
+    }
+
+    .chat-bubble.bot {
+      background: rgba(34, 197, 94, .1);
+      border: 1px solid rgba(34, 197, 94, .15);
+      align-self: flex-start;
+      border-bottom-left-radius: 4px;
+      color: var(--text);
+    }
+
+    .chat-bubble.user {
+      background: rgba(255, 255, 255, .06);
+      border: 1px solid rgba(255, 255, 255, .08);
+      align-self: flex-end;
+      border-bottom-right-radius: 4px;
+      color: var(--text-sub);
+    }
+
+    .chat-bubble .sender {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .8px;
+      margin-bottom: 6px;
+      display: block;
+    }
+
+    .chat-bubble.bot .sender {
+      color: var(--accent);
+    }
+
+    .chat-bubble.user .sender {
+      color: var(--text-muted);
+    }
+
+    /* ── Crop cards mockup ── */
+    .crop-cards {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .crop-card {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 16px 18px;
+      background: rgba(255, 255, 255, .03);
+      border: 1px solid var(--border);
+      border-radius: var(--r-md);
+      transition: border-color .3s, background .3s;
+    }
+
+    .crop-card:hover {
+      border-color: var(--border-glow);
+      background: rgba(34, 197, 94, .04);
+    }
+
+    .crop-rank {
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
+      display: grid;
+      place-items: center;
+      font-size: 14px;
+      font-weight: 800;
+      color: var(--accent);
+      background: var(--accent-glow);
+      border: 1px solid rgba(34, 197, 94, .15);
+      flex-shrink: 0;
+    }
+
+    .crop-info {
+      flex: 1;
+    }
+
+    .crop-name {
+      font-size: 15px;
+      font-weight: 700;
+      margin-bottom: 2px;
+    }
+
+    .crop-detail {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .crop-score {
+      font-family: var(--mono);
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--accent);
+      flex-shrink: 0;
+    }
+
+    /* ── Timeline mockup ── */
+    .timeline-mock {
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+      position: relative;
+      z-index: 1;
+      padding-left: 24px;
+      border-left: 2px solid var(--border);
+    }
+
+    .tl-item {
+      position: relative;
+      padding: 16px 0 16px 24px;
+    }
+
+    .tl-item::before {
+      content: '';
+      position: absolute;
+      left: -7px;
+      top: 22px;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: var(--accent-glow);
+      border: 2px solid var(--accent-dim);
+    }
+
+    .tl-item.active::before {
+      background: var(--accent);
+      box-shadow: 0 0 12px rgba(34, 197, 94, .3);
+    }
+
+    .tl-label {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--text-muted);
+      margin-bottom: 4px;
+    }
+
+    .tl-title {
+      font-size: 15px;
+      font-weight: 700;
+      margin-bottom: 2px;
+    }
+
+    .tl-desc {
+      font-size: 13px;
+      color: var(--text-sub);
+      line-height: 1.5;
+    }
+
+    /* ── Weather widget mockup ── */
+    .weather-widget {
+      position: relative;
+      z-index: 1;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    .weather-card {
+      padding: 20px;
+      background: rgba(255, 255, 255, .03);
+      border: 1px solid var(--border);
+      border-radius: var(--r-md);
+      text-align: center;
+      transition: border-color .3s, background .3s, transform .2s;
+      cursor: pointer;
+    }
+
+    .weather-card:hover {
+      border-color: var(--border-glow);
+      background: rgba(34, 197, 94, .04);
+      transform: translateY(-2px);
+    }
+
+    .weather-card .w-icon {
+      margin-bottom: 8px;
+    }
+
+    .weather-card .w-icon .mi {
+      font-size: 32px;
+      color: var(--accent);
+    }
+
+    .weather-card .w-value {
+      font-size: 22px;
+      font-weight: 800;
+      margin-bottom: 2px;
+    }
+
+    .weather-card .w-label {
+      font-size: 12px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: .5px;
+    }
+
+
+    /* ── Multilingual mockup ── */
+    .lang-stack {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .lang-row {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 14px 18px;
+      background: rgba(255, 255, 255, .03);
+      border: 1px solid var(--border);
+      border-radius: var(--r-md);
+    }
+
+    .lang-flag {
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
+      display: grid;
+      place-items: center;
+      background: rgba(255, 255, 255, .04);
+      flex-shrink: 0;
+    }
+
+    .lang-flag .mi {
+      font-size: 20px;
+      color: var(--accent);
+    }
+
+    .lang-content {
+      flex: 1;
+    }
+
+    .lang-name {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: .5px;
+      margin-bottom: 3px;
+    }
+
+    .lang-text {
+      font-size: 14px;
+      color: var(--text-sub);
+    }
+
+    .lang-row .voice-icon {
+      color: var(--accent);
+      flex-shrink: 0;
+      cursor: pointer;
+      transition: transform .2s;
+    }
+
+    .lang-row .voice-icon .mi {
+      font-size: 22px;
+    }
+
+    .lang-row .voice-icon:hover {
+      transform: scale(1.15);
+    }
+
+    /* ── Code block ── */
+    .code-block {
+      font-family: var(--mono);
+      font-size: 13px;
+      line-height: 1.8;
+      color: var(--text-sub);
+      position: relative;
+      z-index: 1;
+    }
+
+    .code-block .kw {
+      color: #c084fc;
+    }
+
+    .code-block .fn {
+      color: #60a5fa;
+    }
+
+    .code-block .str {
+      color: #4ade80;
+    }
+
+    .code-block .cm {
+      color: var(--text-muted);
+      font-style: italic;
+    }
+
+    /* ═══════════════════════════════════════════
+       Technology
+    ═══════════════════════════════════════════ */
+    #tech {
+      position: relative;
+      z-index: 1;
+      padding: 60px clamp(20px, 5vw, 64px) 40px;
+    }
+
+    .section-header {
+      text-align: center;
+      margin-bottom: 64px;
+    }
+
+    .section-label {
+      display: inline-block;
+      font-family: var(--mono);
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 14px;
+    }
+
+    .section-title {
+      font-size: clamp(32px, 4vw, 44px);
+      font-weight: 800;
+      letter-spacing: -1px;
+      margin-bottom: 16px;
+    }
+
+    .section-desc {
+      font-size: 17px;
+      color: var(--text-sub);
+      max-width: 600px;
+      margin: 0 auto;
+      line-height: 1.6;
+    }
+
+    .tech-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 64px;
+      align-items: center;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    .tech-content h3 {
+      font-size: 28px;
+      font-weight: 800;
+      letter-spacing: -.5px;
+      margin-bottom: 16px;
+    }
+
+    .tech-content p {
+      font-size: 16px;
+      color: var(--text-sub);
+      line-height: 1.6;
+      margin-bottom: 24px;
+    }
+
+    .tech-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .tech-list li {
+      font-size: 15px;
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .tech-list .check {
+      color: var(--accent);
+      font-weight: 800;
+      font-size: 14px;
+    }
+
+    .tech-visual {
+      position: relative;
+      background: rgba(255, 255, 255, .02);
+      border: 1px solid var(--border);
+      border-radius: var(--r-xl);
+      padding: 32px;
+    }
+
+    .tech-visual::before {
+      content: '';
+      position: absolute;
+      top: -20%;
+      left: -20%;
+      width: 140%;
+      height: 140%;
+      background: radial-gradient(circle, rgba(34, 197, 94, .05) 0%, transparent 60%);
+      pointer-events: none;
+    }
+
+    /* ═══════════════════════════════════════════
+       CTA
+    ═══════════════════════════════════════════ */
+    .cta-section {
+      position: relative;
+      z-index: 1;
+      text-align: center;
+      padding: 40px clamp(20px, 5vw, 64px) 60px;
+      overflow: hidden;
+    }
+
+    .cta-section::before {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 600px;
+      height: 600px;
+      background: radial-gradient(circle, rgba(34, 197, 94, .06) 0%, transparent 60%);
+      pointer-events: none;
+    }
+
+    .cta-content {
+      position: relative;
+      z-index: 1;
+      max-width: 640px;
+      margin: 0 auto;
+    }
+
+    .cta-content h2 {
+      font-size: clamp(28px, 4vw, 44px);
+      font-weight: 800;
+      letter-spacing: -1px;
+      margin-bottom: 16px;
+    }
+
+    .cta-content p {
+      font-size: 17px;
+      color: var(--text-sub);
+      margin-bottom: 36px;
+      line-height: 1.6;
+    }
+
+    /* ═══════════════════════════════════════════
+       Footer
+    ═══════════════════════════════════════════ */
+    footer {
+      position: relative;
+      z-index: 1;
+      border-top: 1px solid var(--border);
+      background: var(--bg-alt);
+      padding: 32px clamp(20px, 5vw, 64px);
+    }
+
+    .footer-inner {
+      max-width: 1200px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .footer-brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 700;
+      font-size: 18px;
+    }
+
+    .footer-brand .logo-icon {
+      width: 30px;
+      height: 30px;
+      background: var(--grad-accent);
+      border-radius: 8px;
+      display: grid;
+      place-items: center;
+      font-size: 14px;
+      color: #050a08;
+      font-weight: 900;
+    }
+
+    .footer-copy {
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+
+    /* ═══════════════════════════════════════════
+       Animations
+    ═══════════════════════════════════════════ */
+    @keyframes fadeInUp {
+      from {
+        opacity: 0;
+        transform: translateY(30px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .reveal {
+      opacity: 0;
+      transform: translateY(40px);
+      transition: opacity .7s ease, transform .7s ease;
+    }
+
+    .reveal.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    /* stagger children */
+    .reveal-children>* {
+      opacity: 0;
+      transform: translateY(20px);
+      transition: opacity .5s ease, transform .5s ease;
+    }
+
+    .reveal-children.visible>*:nth-child(1) {
+      transition-delay: .05s;
+      opacity: 1;
+      transform: none;
+    }
+
+    .reveal-children.visible>*:nth-child(2) {
+      transition-delay: .12s;
+      opacity: 1;
+      transform: none;
+    }
+
+    .reveal-children.visible>*:nth-child(3) {
+      transition-delay: .19s;
+      opacity: 1;
+      transform: none;
+    }
+
+    .reveal-children.visible>*:nth-child(4) {
+      transition-delay: .26s;
+      opacity: 1;
+      transform: none;
+    }
+
+    .reveal-children.visible>*:nth-child(5) {
+      transition-delay: .33s;
+      opacity: 1;
+      transform: none;
+    }
+
+    .reveal-children.visible>*:nth-child(6) {
+      transition-delay: .40s;
+      opacity: 1;
+      transform: none;
+    }
+
+    /* ═══════════════════════════════════════════
+       Responsive
+    ═══════════════════════════════════════════ */
+    @media (max-width: 768px) {
+
+      .flow-step {
+        grid-template-columns: 1fr;
+        gap: 40px;
+        padding: 60px 20px;
+      }
+
+      .flow-step::before {
+        left: 24px;
+        top: 60px;
+        width: 40px;
+        height: 40px;
+        font-size: 16px;
+      }
+
+      .journey::before {
+        left: 24px;
+      }
+
+      .flow-step.reverse .flow-text {
+        order: 1;
+      }
+
+      .flow-step.reverse .flow-visual {
+        order: 2;
+      }
+
+      .flow-text,
+      .flow-visual {
+        padding-left: 48px;
+        padding-right: 0;
+      }
+
+      .visual-pane {
+        padding: 24px 16px;
+      }
+
+      .chat-bubble {
+        padding: 12px 14px;
+        font-size: 13px;
+        max-width: 90%;
+      }
+
+      .timeline-mock {
+        padding-left: 16px;
+      }
+
+      .tl-item {
+        padding: 12px 0 12px 20px;
+      }
+
+      .weather-widget {
+        grid-template-columns: 1fr;
+      }
+
+      .tech-grid {
+        grid-template-columns: 1fr;
+        gap: 40px;
+      }
+
+      .footer-inner {
+        flex-direction: column;
+        text-align: center;
+      }
+    }
+
+
+
+    /* Scrollbar */
+    ::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: var(--bg);
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: var(--border);
+      border-radius: 10px;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: var(--accent-dim);
+    }
+  </style>
+</head>
+
+<body>
+
+  <canvas id="particles-canvas"></canvas>
+
+
+
+  <!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+       Hero
+  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
+  <section class="hero" id="hero">
+    <div class="hero-content">
+      <div class="hero-badge">
+        <span class="dot"></span>
+        AI-Powered Agricultural Intelligence
+      </div>
+      <h1>
+        Smarter Farming<br />
+        <span class="gradient-text">Starts with Oxian</span>
+      </h1>
+      <p class="hero-subtitle">
+        Your AI agronomist that understands your land, weather, and crops.
+        Get personalized recommendations, real-time insights, and expert guidance
+        — all in your language.
+      </p>
+      <div class="hero-actions">
+        <button class="btn-primary" onclick="document.getElementById('flow-farm').scrollIntoView({behavior:'smooth'})">
+          See How It Works
+        </button>
+        <button class="btn-secondary" onclick="document.getElementById('cta').scrollIntoView({behavior:'smooth'})">
+          Get Started
+        </button>
+      </div>
+    </div>
+
+  </section>
+
+  <!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+       Journey Flow
+  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
+  <div class="journey">
+
+    <!-- ── Step 1: Tell Us About Your Farm ── -->
+    <div class="flow-step" data-step="1" id="flow-farm">
+      <div class="flow-text reveal">
+        <span class="flow-label">Step 1</span>
+        <h2 class="flow-title">Tell Oxian About Your Farm</h2>
+        <p class="flow-desc">
+          No forms to fill. Just have a conversation. Oxian's AI walks you through a
+          guided survey — asking about your land, soil, water source, and crop history
+          in a natural, conversational flow. It captures everything needed to build
+          your complete farm profile.
+        </p>
+        <div class="flow-tags">
+          <span class="flow-tag"><span class="tag-dot"></span> Soil &amp; Water</span>
+          <span class="flow-tag"><span class="tag-dot"></span> Location</span>
+          <span class="flow-tag"><span class="tag-dot"></span> Crop History</span>
+          <span class="flow-tag"><span class="tag-dot"></span> Land Area</span>
+        </div>
+      </div>
+      <div class="flow-visual reveal">
+        <div class="visual-pane">
+          <div class="chat-mock reveal-children">
+            <div class="chat-bubble bot">
+              <span class="sender">Oxian</span>
+              Welcome! Let's set up your farm profile. What's the name of your farm and where is it located?
+            </div>
+            <div class="chat-bubble user">
+              <span class="sender">You</span>
+              It's called Green Valley Farm, near Anantapur, Andhra Pradesh. About 5 acres.
+            </div>
+            <div class="chat-bubble bot">
+              <span class="sender">Oxian</span>
+              Great! What type of soil does your farm have, and what's your primary water source?
+            </div>
+            <div class="chat-bubble user">
+              <span class="sender">You</span>
+              Red soil, mostly rain-fed with a borewell for backup.
+            </div>
+            <div class="chat-bubble bot">
+              <span class="sender">Oxian</span>
+              Got it. What crops did you grow in the last season?
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Step 2: Smart Crop Recommendations ── -->
+    <div class="flow-step reverse" data-step="2" id="flow-recommend">
+      <div class="flow-text reveal">
+        <span class="flow-label">Step 2</span>
+        <h2 class="flow-title">Get AI Crop Recommendations</h2>
+        <p class="flow-desc">
+          Based on your farm profile, live weather data, soil analysis, crop rotation
+          history, and regional market trends — Oxian's AI generates scientifically
+          ranked crop suggestions. Each recommendation comes with a suitability score,
+          sowing window, and expected yield.
+        </p>
+        <div class="flow-tags">
+          <span class="flow-tag"><span class="tag-dot"></span> Weather Analysis</span>
+          <span class="flow-tag"><span class="tag-dot"></span> Soil Matching</span>
+          <span class="flow-tag"><span class="tag-dot"></span> Market Trends</span>
+          <span class="flow-tag"><span class="tag-dot"></span> Crop Rotation</span>
+        </div>
+      </div>
+      <div class="flow-visual reveal">
+        <div class="visual-pane">
+          <div class="crop-cards reveal-children">
+            <div class="crop-card">
+              <div class="crop-rank">#1</div>
+              <div class="crop-info">
+                <div class="crop-name">Groundnut (Kharif)</div>
+                <div class="crop-detail">Sow: Jul 1–15 · Harvest: Oct · Red soil optimal</div>
+              </div>
+              <div class="crop-score">0.94</div>
+            </div>
+            <div class="crop-card">
+              <div class="crop-rank">#2</div>
+              <div class="crop-info">
+                <div class="crop-name">Sunflower</div>
+                <div class="crop-detail">Sow: Jun 20–Jul 5 · Low water need · Good market</div>
+              </div>
+              <div class="crop-score">0.87</div>
+            </div>
+            <div class="crop-card">
+              <div class="crop-rank">#3</div>
+              <div class="crop-info">
+                <div class="crop-name">Pearl Millet (Bajra)</div>
+                <div class="crop-detail">Sow: Jul · Drought resistant · Rotation benefit</div>
+              </div>
+              <div class="crop-score">0.82</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Step 3: Plan Your Cultivation ── -->
+    <div class="flow-step" data-step="3" id="flow-plan">
+      <div class="flow-text reveal">
+        <span class="flow-label">Step 3</span>
+        <h2 class="flow-title">Plan Your Cultivation</h2>
+        <p class="flow-desc">
+          Once you select a crop, Oxian generates a detailed cultivation plan
+          — complete with sowing schedules, task timelines, investment breakdowns,
+          and intercropping options. Every plan is tailored to your specific farm
+          conditions and regional practices.
+        </p>
+        <div class="flow-tags">
+          <span class="flow-tag"><span class="tag-dot"></span> Task Scheduling</span>
+          <span class="flow-tag"><span class="tag-dot"></span> Investment Costs</span>
+          <span class="flow-tag"><span class="tag-dot"></span> Intercropping</span>
+          <span class="flow-tag"><span class="tag-dot"></span> Harvest Timeline</span>
+        </div>
+      </div>
+      <div class="flow-visual reveal">
+        <div class="visual-pane">
+          <div class="timeline-mock reveal-children">
+            <div class="tl-item active">
+              <div class="tl-label">Week 1–2</div>
+              <div class="tl-title">Land Preparation</div>
+              <div class="tl-desc">Ploughing, leveling, and soil treatment for groundnut</div>
+            </div>
+            <div class="tl-item active">
+              <div class="tl-label">Week 3</div>
+              <div class="tl-title">Sowing &amp; Seed Treatment</div>
+              <div class="tl-desc">Treated seeds at 20cm spacing, basal fertilizer application</div>
+            </div>
+            <div class="tl-item">
+              <div class="tl-label">Week 4–6</div>
+              <div class="tl-title">Weeding &amp; Irrigation</div>
+              <div class="tl-desc">First weeding at 20 DAS, supplemental irrigation if dry</div>
+            </div>
+            <div class="tl-item">
+              <div class="tl-label">Week 8–10</div>
+              <div class="tl-title">Pest Monitoring</div>
+              <div class="tl-desc">Scout for leaf miner, thrips; apply neem-based control if needed</div>
+            </div>
+            <div class="tl-item">
+              <div class="tl-label">Week 14–16</div>
+              <div class="tl-title">Harvest</div>
+              <div class="tl-desc">Harvest at 70% pod maturity, dry pods to 8% moisture</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Step 4: Chat Anytime ── -->
+    <div class="flow-step reverse" data-step="4" id="flow-chat">
+      <div class="flow-text reveal">
+        <span class="flow-label">Step 4</span>
+        <h2 class="flow-title">Chat with Your AI Farm Assistant</h2>
+        <p class="flow-desc">
+          Got a question at any stage? Just ask. Oxian's chat assistant draws on
+          live weather data, your farm profile, and agricultural expertise to give
+          you practical, grounded answers. It refuses to guess — using real data
+          from weather APIs and your actual farm conditions.
+        </p>
+        <div class="flow-tags">
+          <span class="flow-tag"><span class="tag-dot"></span> Pest Management</span>
+          <span class="flow-tag"><span class="tag-dot"></span> Weather Advice</span>
+          <span class="flow-tag"><span class="tag-dot"></span> Farming Q&amp;A</span>
+        </div>
+      </div>
+      <div class="flow-visual reveal">
+        <div class="visual-pane">
+          <div class="chat-mock reveal-children">
+            <div class="chat-bubble user">
+              <span class="sender">You</span>
+              My groundnut leaves are turning yellow. What should I do?
+            </div>
+            <div class="chat-bubble bot">
+              <span class="sender">Oxian</span>
+              Yellowing in groundnut can indicate iron deficiency (common in alkaline patches of red soil) or early leaf
+              spot disease. Since your soil is red and rain-fed, I'd recommend checking for circular brown spots on
+              lower leaves. If spots are present, apply Mancozeb at 2.5g/L. For iron deficiency, a foliar spray of 0.5%
+              FeSO₄ works well.
+            </div>
+            <div class="chat-bubble user">
+              <span class="sender">You</span>
+              Will it rain this week? Should I wait to spray?
+            </div>
+            <div class="chat-bubble bot">
+              <span class="sender">Oxian</span>
+              Let me check the forecast for Anantapur... Light rain expected on Thursday and Friday. I'd recommend
+              spraying tomorrow morning to allow 24 hours of dry weather for absorption.
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Step 5: Weather & Notifications ── -->
+    <div class="flow-step" data-step="5" id="flow-weather">
+      <div class="flow-text reveal">
+        <span class="flow-label">Step 5</span>
+        <h2 class="flow-title">Stay Informed with Live Weather &amp; Alerts</h2>
+        <p class="flow-desc">
+          Oxian integrates live weather feeds, 5-day forecasts, and air quality
+          monitoring directly into every recommendation and chat response.
+          Smart notifications keep you updated on weather shifts, upcoming tasks,
+          and cultivation milestones — so nothing catches you off guard.
+        </p>
+        <div class="flow-tags">
+          <span class="flow-tag"><span class="tag-dot"></span> Live Weather</span>
+          <span class="flow-tag"><span class="tag-dot"></span> 5-Day Forecast</span>
+          <span class="flow-tag"><span class="tag-dot"></span> Air Quality</span>
+          <span class="flow-tag"><span class="tag-dot"></span> Task Alerts</span>
+        </div>
+      </div>
+      <div class="flow-visual reveal">
+        <div class="visual-pane">
+          <div class="weather-widget reveal-children">
+            <div class="weather-card">
+              <div class="w-icon"><span class="mi filled">thermostat</span></div>
+              <div class="w-value">34°C</div>
+              <div class="w-label">Temperature</div>
+            </div>
+            <div class="weather-card">
+              <div class="w-icon"><span class="mi filled">humidity_mid</span></div>
+              <div class="w-value">62%</div>
+              <div class="w-label">Humidity</div>
+            </div>
+            <div class="weather-card">
+              <div class="w-icon"><span class="mi filled">rainy</span></div>
+              <div class="w-value">40%</div>
+              <div class="w-label">Rain Chance</div>
+            </div>
+            <div class="weather-card">
+              <div class="w-icon"><span class="mi filled">air</span></div>
+              <div class="w-value">Good</div>
+              <div class="w-label">Air Quality</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Step 6: Speak Your Language ── -->
+    <div class="flow-step reverse" data-step="6" id="flow-lang">
+      <div class="flow-text reveal">
+        <span class="flow-label">Step 6</span>
+        <h2 class="flow-title">Speak Your Language</h2>
+        <p class="flow-desc">
+          Oxian understands and responds in the farmer's preferred language.
+          Every recommendation, chat response, and farm profile is maintained in
+          both English and the farmer's language. Text-to-speech support means
+          farmers can listen to responses instead of reading them.
+        </p>
+        <div class="flow-tags">
+          <span class="flow-tag"><span class="tag-dot"></span> Multilingual Chat</span>
+          <span class="flow-tag"><span class="tag-dot"></span> Translation</span>
+          <span class="flow-tag"><span class="tag-dot"></span> Text-to-Speech</span>
+        </div>
+      </div>
+      <div class="flow-visual reveal">
+        <div class="visual-pane">
+          <div class="lang-stack reveal-children">
+            <div class="lang-row">
+              <div class="lang-flag"><span class="mi filled">translate</span></div>
+              <div class="lang-content">
+                <div class="lang-name">Telugu</div>
+                <div class="lang-text">మీ పొలంలో వేరుశనగ పంట వేయడానికి ఇది మంచి సమయం.</div>
+              </div>
+              <span class="voice-icon"><span class="mi filled">volume_up</span></span>
+            </div>
+            <div class="lang-row">
+              <div class="lang-flag"><span class="mi filled">translate</span></div>
+              <div class="lang-content">
+                <div class="lang-name">Hindi</div>
+                <div class="lang-text">आपके खेत में मूंगफली की बुवाई के लिए यह अच्छा समय है।</div>
+              </div>
+              <span class="voice-icon"><span class="mi filled">volume_up</span></span>
+            </div>
+            <div class="lang-row">
+              <div class="lang-flag"><span class="mi filled">translate</span></div>
+              <div class="lang-content">
+                <div class="lang-name">Kannada</div>
+                <div class="lang-text">ನಿಮ್ಮ ಕೃಷಿಯಲ್ಲಿ ಕಡಲೆಕಾಯಿ ಬೆಳೆಯಲು ಇದು ಒಳ್ಳೆಯ ಸಮಯ.</div>
+              </div>
+              <span class="voice-icon"><span class="mi filled">volume_up</span></span>
+            </div>
+            <div class="lang-row">
+              <div class="lang-flag"><span class="mi filled">language</span></div>
+              <div class="lang-content">
+                <div class="lang-name">English</div>
+                <div class="lang-text">This is a good time to sow groundnut on your farm.</div>
+              </div>
+              <span class="voice-icon"><span class="mi filled">volume_up</span></span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /.journey -->
+
+  <!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+       CTA
+  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
+  <!-- ─── Technology ─── -->
+  <section id="tech">
+    <div class="section-header reveal">
+      <span class="section-label">Technology</span>
+      <h2 class="section-title">Built with Modern AI Infrastructure</h2>
+      <p class="section-desc">
+        Oxian combines the latest in AI, real-time data, and agricultural science.
+      </p>
+    </div>
+    <div class="tech-grid">
+      <div class="tech-visual reveal">
+        <div class="code-block">
+          <span class="cm"># Intelligent Reasoning Research Agent</span><br/>
+          <br/>
+          <span class="kw">async def</span> <span class="fn">reason_and_recommend</span>(farm):<br/>
+          &nbsp;&nbsp;weather = <span class="kw">await</span> <span class="fn">get_live_weather</span>(farm.location)<br/>
+          &nbsp;&nbsp;soil &nbsp;&nbsp;&nbsp;= <span class="fn">analyze_soil</span>(farm.soil_profile)<br/>
+          &nbsp;&nbsp;market &nbsp;= <span class="fn">get_market_trends</span>(farm.region)<br/>
+          <br/>
+          &nbsp;&nbsp;candidates = <span class="fn">ai_agent.reason</span>(<br/>
+          &nbsp;&nbsp;&nbsp;&nbsp;farm_profile &nbsp;= farm,<br/>
+          &nbsp;&nbsp;&nbsp;&nbsp;weather_data &nbsp;= weather,<br/>
+          &nbsp;&nbsp;&nbsp;&nbsp;soil_analysis = soil,<br/>
+          &nbsp;&nbsp;&nbsp;&nbsp;market_data &nbsp;&nbsp;= market,<br/>
+          &nbsp;&nbsp;)<br/>
+          <br/>
+          &nbsp;&nbsp;<span class="kw">return</span> <span class="fn">rank_by_suitability</span>(candidates)
+        </div>
+      </div>
+      <div class="tech-content reveal">
+        <h3>Intelligent by Design</h3>
+        <p>
+          Every recommendation is grounded in real data — live weather feeds, soil chemistry,
+          historical crop rotations, and regional market intelligence come together through
+          advanced AI reasoning.
+        </p>
+        <ul class="tech-list">
+          <li><span class="check">✓</span> Advanced AI models for crop science reasoning</li>
+          <li><span class="check">✓</span> Live weather & air quality integration</li>
+          <li><span class="check">✓</span> Geo-aware market price intelligence</li>
+          <li><span class="check">✓</span> Multilingual NLP with real-time translation</li>
+          <li><span class="check">✓</span> Text-to-speech for voice-first interaction</li>
+          <li><span class="check">✓</span> Crop image search and AI generation</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─── CTA ─── -->
+  <section class="cta-section" id="cta">
+    <div class="cta-content reveal">
+      <span class="section-label">Get Started</span>
+      <h2>Ready to Transform Your Farm?</h2>
+      <p>
+        Join Oxian today and let AI help you make smarter farming decisions.
+        Available on Android — your farm intelligence companion is just a download away.
+      </p>
+      <button class="btn-primary" style="font-size: 18px; padding: 18px 40px;">
+        <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><path d="M3,20.5V3.5C3,2.91 3.34,2.39 3.84,2.15L13.69,12L3.84,21.85C3.34,21.6 3,21.09 3,20.5M16.81,15.12L6.05,21.34L14.54,12.85L16.81,15.12M20.16,10.81C20.5,11.08 20.75,11.5 20.75,12C20.75,12.5 20.53,12.9 20.18,13.18L17.89,14.5L15.39,12L17.89,9.5L20.16,10.81M6.05,2.66L16.81,8.88L14.54,11.15L6.05,2.66Z" /></svg>
+        Download Oxian
+      </button>
+    </div>
+  </section>
+
+  <!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+       Footer
+  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
+  <footer>
+    <div class="footer-inner">
+      <div class="footer-brand">
+        Oxian
+      </div>
+      <p class="footer-copy">© 2026 Oxian. Built for farmers, powered by AI.</p>
+    </div>
+  </footer>
+
+  <!-- ═══════════════════════════════════════════
+       Scripts
+  ═══════════════════════════════════════════ -->
+  <script>
+    /* ── Particles ── */
+    (function () {
+      const c = document.getElementById('particles-canvas');
+      const ctx = c.getContext('2d');
+      let P = [];
+      const N = 50;
+
+      function resize() { c.width = innerWidth; c.height = innerHeight; }
+      addEventListener('resize', resize); resize();
+
+      class Dot {
+        constructor() { this.reset(); }
+        reset() {
+          this.x = Math.random() * c.width;
+          this.y = Math.random() * c.height;
+          this.r = Math.random() * 1.8 + .4;
+          this.vx = (Math.random() - .5) * .25;
+          this.vy = (Math.random() - .5) * .25;
+          this.o = Math.random() * .25 + .04;
+        }
+        update() {
+          this.x += this.vx; this.y += this.vy;
+          if (this.x < 0 || this.x > c.width) this.vx *= -1;
+          if (this.y < 0 || this.y > c.height) this.vy *= -1;
+        }
+        draw() {
+          ctx.beginPath(); ctx.arc(this.x, this.y, this.r, 0, Math.PI * 2);
+          ctx.fillStyle = `rgba(34,197,94,${this.o})`; ctx.fill();
+        }
+      }
+      for (let i = 0; i < N; i++) P.push(new Dot());
+
+      (function loop() {
+        ctx.clearRect(0, 0, c.width, c.height);
+        P.forEach(p => { p.update(); p.draw(); });
+        for (let i = 0; i < P.length; i++)
+          for (let j = i + 1; j < P.length; j++) {
+            const dx = P[i].x - P[j].x, dy = P[i].y - P[j].y;
+            const d = Math.sqrt(dx * dx + dy * dy);
+            if (d < 140) {
+              ctx.beginPath(); ctx.moveTo(P[i].x, P[i].y); ctx.lineTo(P[j].x, P[j].y);
+              ctx.strokeStyle = `rgba(34,197,94,${.025 * (1 - d / 140)})`;
+              ctx.lineWidth = .5; ctx.stroke();
+            }
+          }
+        requestAnimationFrame(loop);
+      })();
+    })();
+
+
+
+    /* ── Scroll reveal ── */
+    const obs = new IntersectionObserver(entries => {
+      entries.forEach(e => {
+        if (e.isIntersecting) { e.target.classList.add('visible'); obs.unobserve(e.target); }
+      });
+    }, { threshold: .1, rootMargin: '0px 0px -30px 0px' });
+
+    document.querySelectorAll('.reveal, .reveal-children').forEach(el => obs.observe(el));
+  </script>
+</body>
+
+</html>

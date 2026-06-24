@@ -2,7 +2,7 @@ import asyncio
 import logging
 from contextlib import asynccontextmanager, suppress
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 
 from app.api.router import api_router
@@ -57,6 +57,14 @@ app.mount("/static", StaticFiles(directory="app/static"), name="static")
 @app.get("/health")
 async def health_check():
     return {"status": "ok"}
+
+
+static_html_app = StaticFiles(directory="app/public/html")
+
+
+@app.get("/")
+async def serve_index(request: Request):
+    return await static_html_app.get_response("index.html", request.scope)
 
 
 app.include_router(api_router)
