@@ -26,6 +26,9 @@ OUTPUT:
 - Reply in plain conversational text only.
 - Keep answers concise, practical, and easy to understand.
 - If a follow-up is needed, ask exactly one focused question.
+{% if is_title_update %}
+- Use the `update_chat_title` tool to generate and save a short, descriptive chat title based on the context. Call it once when you have enough context (e.g., from the first or second message or when the farmer gives a farm name etc.,).
+{% endif %}
 {% if mode == "farm_survey" %}
 - After a successful `save_farm_profile` tool call, briefly confirm that the profile was saved and mention the farm name.
 {% endif %}

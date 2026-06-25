@@ -14,12 +14,10 @@ from langchain_core.tools import tool
 from langchain_google_genai import ChatGoogleGenerativeAI
 from pydantic import ValidationError
 
+from app.ai.prompts.prompt_manager import PromptManager
 from app.ai.tools.weather import WEATHER_TOOLS
 from app.core.config import settings
-from app.workers.process_manager import process_manager
-from app.workers.queue import enqueue
 from app.infrastructure.storage.enums import StorageEntity
-from app.ai.prompts.prompt_manager import PromptManager
 from app.repositories import (
     chat_repository,
     message_repository,
@@ -54,6 +52,8 @@ from app.schemas.message import (
 )
 from app.schemas.process import Process, ProcessError, State
 from app.services import farm_profile_service, storage_service
+from app.workers.process_manager import process_manager
+from app.workers.queue import enqueue
 
 logger = logging.getLogger(__name__)
 
@@ -326,10 +326,7 @@ async def _build_user_message(
 
 
 async def _build_prompt(
-    *,
-    mode: ChatMode,
-    user_id: str,
-    chat_title: str,
+    *, mode: ChatMode, user_id: str, chat_title: str, is_title_update: bool
 ) -> str:
     preference = await user_pref_repository.get_by_user_id(user_id)
     response_language_code = preference.language_code if preference else None
@@ -340,6 +337,7 @@ async def _build_prompt(
         "mode": mode.value,
         "response_language_code": response_language_code,
         "chat_title": chat_title,
+        "is_title_update": is_title_update,
     }
     if mode == ChatMode.FARM_SURVEY:
         prompt_kwargs["user_id"] = user_id
@@ -377,10 +375,12 @@ async def _run_turn(
             limit=settings.CHAT_HISTORY_LIMIT,
         )
         history_messages = [_to_history_message(msg) for msg in history[:-1]]
+        is_title_update = len(history_messages) <= 5
         system_prompt = await _build_prompt(
             mode=chat.mode,
             user_id=chat.user_id,
             chat_title=chat.title,
+            is_title_update=is_title_update,
         )
 
         @tool(args_schema=TranslatedFarmProfileInput)
@@ -461,7 +461,18 @@ async def _run_turn(
             )
             return {"farm_id": saved.id, "name": saved.user_language.name}
 
+        @tool
+        async def update_chat_title(new_title: str) -> dict[str, str]:
+            """Update the chat title to a short, descriptive name based on the conversation context (e.g., when a farm name is mentioned)."""
+            nonlocal active_chat
+            active_chat = active_chat.model_copy(update={"title": new_title})
+            await chat_repository.save(active_chat)
+            await events.put(_sse_event("title_updated", {"title": new_title}))
+            return {"status": "success", "new_title": new_title}
+
         tools = list(WEATHER_TOOLS)
+        if is_title_update:
+            tools.append(update_chat_title)
         if chat.mode == ChatMode.FARM_SURVEY:
             tools.append(save_farm_profile)
         agent = create_agent(
