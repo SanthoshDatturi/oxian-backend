@@ -1,6 +1,6 @@
 import logging
-import time
 from collections import defaultdict
+from datetime import datetime, timedelta, timezone
 from typing import IO, Union
 
 from app.infrastructure.storage import operations as files
@@ -16,7 +16,7 @@ from app.schemas.file import File, FileStatus
 
 logger = logging.getLogger(__name__)
 
-TEMP_FILE_RETENTION_SECONDS = 5 * 60 * 60
+TEMP_FILE_RETENTION = timedelta(hours=5)
 
 
 async def _delete_blob_if_exists(file: File) -> bool:
@@ -207,11 +207,18 @@ async def _activate_files(
                 actual_content_type = await files.get_blob_content_type(
                     file_id=stored_file.id, scope=stored_file.storage_scope
                 )
-                if actual_content_type and actual_content_type != stored_file.content_type:
-                    await files_repository.update_content_type(stored_file.id, actual_content_type)
+                if (
+                    actual_content_type
+                    and actual_content_type != stored_file.content_type
+                ):
+                    await files_repository.update_content_type(
+                        stored_file.id, actual_content_type
+                    )
                     stored_file.content_type = actual_content_type
             except Exception:
-                logger.exception("Failed to sync blob content type for file_id=%s", stored_file.id)
+                logger.exception(
+                    "Failed to sync blob content type for file_id=%s", stored_file.id
+                )
 
         return activated_files
     except ValueError as exc:
@@ -244,8 +251,8 @@ async def _download_file(stored_file: File) -> tuple[File, bytes]:
 
 
 async def cleanup_expired_temporary_files() -> int:
-    cutoff_ts = time.time() - TEMP_FILE_RETENTION_SECONDS
-    expired_files = await files_repository.list_expired_temp(cutoff_ts=cutoff_ts)
+    cutoff_at = datetime.now(timezone.utc) - TEMP_FILE_RETENTION
+    expired_files = await files_repository.list_expired_temp(cutoff_at=cutoff_at)
     deleting_files = await files_repository.list_deleting()
     files_by_id = {stored_file.id: stored_file for stored_file in deleting_files}
     files_by_id.update({stored_file.id: stored_file for stored_file in expired_files})

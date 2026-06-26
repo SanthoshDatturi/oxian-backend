@@ -1,6 +1,9 @@
-from fastapi import Depends, HTTPException, WebSocket
+import secrets
+
+from fastapi import Depends, Header, HTTPException, WebSocket
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
+from app.core.config import settings
 from app.infrastructure.auth import (
     AuthProviderError,
     ExpiredTokenError,
@@ -55,3 +58,20 @@ async def authenticate_rest(
 ):
     token = credentials.credentials if credentials else ""
     return await _verify_token(token)
+
+
+async def verify_cron_secret(
+    x_cron_secret: str = Header(alias="X-Cron-Secret"),
+) -> None:
+    """
+    Verifies that the request came from the cron service.
+    """
+
+    if not secrets.compare_digest(
+        x_cron_secret,
+        settings.CRON_SECRET,
+    ):
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid cron secret",
+        )

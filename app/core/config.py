@@ -32,6 +32,7 @@ class Settings(BaseSettings):
     )
     CHAT_HISTORY_LIMIT: int = int(os.getenv("CHAT_HISTORY_LIMIT", "16"))
     CROP_IMAGE_EMBEDDING_DIMENSION: int = 512
+    CRON_SECRET: str = os.getenv("CRON_SECRET", "")
 
 
 settings = Settings()

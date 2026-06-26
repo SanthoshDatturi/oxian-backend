@@ -1,5 +1,6 @@
-from pymongo import ASCENDING
-from pymongo import ReturnDocument
+from datetime import datetime
+
+from pymongo import ASCENDING, ReturnDocument
 
 from app.infrastructure.database.collections import get_files_collection
 from app.infrastructure.storage.enums import StorageEntity
@@ -37,7 +38,7 @@ async def _validate_entity(entity: StorageEntity, entity_id: str, user_id: str) 
 
 async def create(file: File) -> File:
     await get_files_collection().insert_one(
-        file.model_dump(by_alias=True, exclude_none=True, mode="json")
+        file.model_dump(by_alias=True, exclude_none=True)
     )
     return file
 
@@ -48,15 +49,19 @@ async def save_active_file(file: File, entity: StorageEntity) -> File:
     if not file.entity_id:
         raise ValueError("Entity id is required.")
 
-    await _validate_entity(entity=entity, entity_id=file.entity_id, user_id=file.user_id)
+    await _validate_entity(
+        entity=entity, entity_id=file.entity_id, user_id=file.user_id
+    )
     await get_files_collection().insert_one(
-        file.model_dump(by_alias=True, exclude_none=True, mode="json")
+        file.model_dump(by_alias=True, exclude_none=True)
     )
     return file
 
 
 async def get_by_id(file_id: str, user_id: str) -> File | None:
-    document = await get_files_collection().find_one({"_id": file_id, "user_id": user_id})
+    document = await get_files_collection().find_one(
+        {"_id": file_id, "user_id": user_id}
+    )
     if not document:
         return None
     return File.model_validate(document)
@@ -71,7 +76,9 @@ async def get_many_by_ids(file_ids: list[str], user_id: str) -> list[File]:
     )
     files = [File.model_validate(document) async for document in cursor]
     files_by_id = {file.id: file for file in files}
-    return [files_by_id[file_id] for file_id in normalized_ids if file_id in files_by_id]
+    return [
+        files_by_id[file_id] for file_id in normalized_ids if file_id in files_by_id
+    ]
 
 
 async def activate_for_entity(
@@ -150,7 +157,9 @@ async def mark_many_deleting(file_ids: list[str]) -> list[File]:
     cursor = get_files_collection().find({"_id": {"$in": normalized_ids}})
     files = [File.model_validate(document) async for document in cursor]
     files_by_id = {file.id: file for file in files}
-    return [files_by_id[file_id] for file_id in normalized_ids if file_id in files_by_id]
+    return [
+        files_by_id[file_id] for file_id in normalized_ids if file_id in files_by_id
+    ]
 
 
 async def list_deleting() -> list[File]:
@@ -158,9 +167,9 @@ async def list_deleting() -> list[File]:
     return [File.model_validate(document) async for document in cursor]
 
 
-async def list_expired_temp(cutoff_ts: float) -> list[File]:
+async def list_expired_temp(cutoff_at: datetime) -> list[File]:
     cursor = get_files_collection().find(
-        {"status": FileStatus.TEMP.value, "created_at": {"$lt": cutoff_ts}}
+        {"status": FileStatus.TEMP.value, "created_at": {"$lt": cutoff_at}}
     )
     return [File.model_validate(document) async for document in cursor]
 
