@@ -1,12 +1,12 @@
 import json
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
+from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
 from app.core.config import settings
+from app.core.errors import ErrorCode, Forbidden, ValidationFailed
 from app.core.security import authenticate_rest
-from app.infrastructure.storage.errors import StorageError
 from app.schemas.crop_image import CropImageFile
 from app.services import crop_image_service
 
@@ -49,7 +49,7 @@ async def require_admin(
     user_payload: dict = Depends(authenticate_rest),
 ) -> dict:
     if user_payload.get("role") != "admin":
-        raise HTTPException(status_code=403, detail="Admin access required")
+        raise Forbidden("Admin access required.")
     return user_payload
 
 
@@ -79,18 +79,14 @@ async def upload_crop_image(
     _: dict = Depends(require_admin),
 ) -> CropImageFile:
     if not file.content_type or not file.content_type.startswith("image/"):
-        raise HTTPException(status_code=400, detail="Image file is required")
-
-    try:
-        return await crop_image_service.upload_new_image(
-            file_stream=file.file,
-            crop_name=crop_name,
-            mime_type=file.content_type,
-            aliases=_parse_aliases(aliases),
+        raise ValidationFailed(
+            "Image file is required.",
+            code=ErrorCode.IMAGE_FILE_REQUIRED,
         )
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-    except RuntimeError as exc:
-        raise HTTPException(status_code=502, detail=str(exc)) from exc
-    except StorageError as exc:
-        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+    return await crop_image_service.upload_new_image(
+        file_stream=file.file,
+        crop_name=crop_name,
+        mime_type=file.content_type,
+        aliases=_parse_aliases(aliases),
+    )

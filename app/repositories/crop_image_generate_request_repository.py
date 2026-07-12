@@ -1,6 +1,8 @@
 from pymongo import DESCENDING
 
-from app.infrastructure.database.collections import get_crop_image_generate_requests_collection
+from app.infrastructure.database.collections import (
+    get_crop_image_generate_requests_collection,
+)
 from app.schemas.crop_image_generate_request import CropImageGenerateRequest
 
 
@@ -52,8 +54,7 @@ async def list_all(limit: int = 50) -> list[CropImageGenerateRequest]:
         .limit(limit)
     )
     return [
-        CropImageGenerateRequest.model_validate(document)
-        async for document in cursor
+        CropImageGenerateRequest.model_validate(document) async for document in cursor
     ]
 
 

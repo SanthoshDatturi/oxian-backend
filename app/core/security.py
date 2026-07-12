@@ -1,9 +1,14 @@
 import secrets
 
-from fastapi import Depends, Header, HTTPException, WebSocket
+from fastapi import Depends, Header, WebSocket
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from app.core.config import settings
+from app.core.errors import (
+    AuthenticationRequired,
+    AuthenticationServiceUnavailable,
+    InvalidAuthenticationToken,
+)
 from app.infrastructure.auth import (
     AuthProviderError,
     ExpiredTokenError,
@@ -23,28 +28,26 @@ def _normalize_bearer_token(token: str) -> str:
 
 async def _verify_token(token: str) -> dict:
     if not token:
-        raise HTTPException(status_code=401, detail="Missing authentication token")
+        raise AuthenticationRequired()
 
     token = _normalize_bearer_token(token)
     if not token:
-        raise HTTPException(status_code=401, detail="Missing authentication token")
+        raise AuthenticationRequired()
 
     try:
         return await verify_token(token)
 
     except InvalidTokenError:
-        raise HTTPException(status_code=401, detail="Invalid token")
+        raise InvalidAuthenticationToken()
 
     except ExpiredTokenError:
-        raise HTTPException(status_code=401, detail="Token expired")
+        raise InvalidAuthenticationToken("Authentication token expired.")
 
     except RevokedTokenError:
-        raise HTTPException(status_code=401, detail="Token revoked")
+        raise InvalidAuthenticationToken("Authentication token revoked.")
 
     except AuthProviderError:
-        raise HTTPException(
-            status_code=503, detail="Authentication service unavailable"
-        )
+        raise AuthenticationServiceUnavailable()
 
 
 async def authenticate_websocket(websocket: WebSocket):
@@ -71,7 +74,4 @@ async def verify_cron_secret(
         x_cron_secret,
         settings.CRON_SECRET,
     ):
-        raise HTTPException(
-            status_code=401,
-            detail="Invalid cron secret",
-        )
+        raise InvalidAuthenticationToken("Invalid cron secret.")

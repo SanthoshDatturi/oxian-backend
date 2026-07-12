@@ -1,5 +1,6 @@
 import inspect
 import logging
+from datetime import datetime, timedelta, timezone
 from typing import IO, Union
 
 from azure.core.exceptions import (
@@ -9,10 +10,13 @@ from azure.core.exceptions import (
     ResourceNotFoundError,
     ServiceRequestError,
 )
-from datetime import datetime, timedelta, timezone
-from azure.storage.blob import generate_blob_sas, BlobSasPermissions, ContentSettings
+from azure.storage.blob import BlobSasPermissions, ContentSettings, generate_blob_sas
 
-from app.infrastructure.providers.azure_blob import get_blob_service_client, get_container_client
+from app.infrastructure.providers.azure_blob import (
+    get_blob_service_client,
+    get_container_client,
+)
+
 from .enums import StorageScope
 from .errors import (
     StorageAuthError,
@@ -136,8 +140,14 @@ async def generate_upload_url(
     """
     try:
         blob_service_client = get_blob_service_client()
-        if not blob_service_client.account_name or not blob_service_client.credential or not hasattr(blob_service_client.credential, "account_key"):
-            raise StorageBackendError("Invalid Azure storage credentials for SAS generation.")
+        if (
+            not blob_service_client.account_name
+            or not blob_service_client.credential
+            or not hasattr(blob_service_client.credential, "account_key")
+        ):
+            raise StorageBackendError(
+                "Invalid Azure storage credentials for SAS generation."
+            )
 
         account_name = blob_service_client.account_name
         account_key = blob_service_client.credential.account_key
@@ -182,8 +192,14 @@ async def generate_download_url(
     """
     try:
         blob_service_client = get_blob_service_client()
-        if not blob_service_client.account_name or not blob_service_client.credential or not hasattr(blob_service_client.credential, "account_key"):
-            raise StorageBackendError("Invalid Azure storage credentials for SAS generation.")
+        if (
+            not blob_service_client.account_name
+            or not blob_service_client.credential
+            or not hasattr(blob_service_client.credential, "account_key")
+        ):
+            raise StorageBackendError(
+                "Invalid Azure storage credentials for SAS generation."
+            )
 
         account_name = blob_service_client.account_name
         account_key = blob_service_client.credential.account_key

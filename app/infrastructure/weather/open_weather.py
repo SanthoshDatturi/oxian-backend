@@ -1,10 +1,14 @@
 import json
-
 import os
 from typing import List, Optional
 
 import httpx
+
 from app.core.config import settings
+from app.infrastructure.weather.errors import (
+    WeatherConfigurationError,
+    WeatherProviderError,
+)
 from app.schemas.weather import (
     AirPollutionResponse,
     CurrentWeatherResponse,
@@ -22,8 +26,13 @@ MAP_BASE_URL = "https://tile.openweathermap.org/map"
 def _require_api_key() -> str:
     api_key = settings.OPENWEATHERMAP_API_KEY
     if not api_key:
-        raise ValueError("OPENWEATHERMAP_API_KEY is not configured.")
+        raise WeatherConfigurationError("OPENWEATHERMAP_API_KEY is not configured.")
     return api_key
+
+
+def _raise_for_unexpected_status(response: httpx.Response) -> None:
+    if response.status_code not in {400, 404}:
+        raise WeatherProviderError("OpenWeather request failed.")
 
 
 async def get_current_weather(
@@ -58,6 +67,7 @@ async def get_current_weather(
             with open(cache_file, "w") as f:
                 json.dump(data, f)
             return CurrentWeatherResponse(**data)
+        _raise_for_unexpected_status(response)
     return None
 
 
@@ -93,6 +103,7 @@ async def get_5_day_3_hour_forecast(
             with open(cache_file, "w") as f:
                 json.dump(data, f)
             return ForecastResponse(**data)
+        _raise_for_unexpected_status(response)
     return None
 
 
@@ -112,6 +123,7 @@ async def get_air_pollution(lat: float, lon: float) -> Optional[AirPollutionResp
         response = await client.get(f"{BASE_URL}/air_pollution", params=params)
         if response.status_code == 200:
             return AirPollutionResponse(**response.json())
+        _raise_for_unexpected_status(response)
     return None
 
 
@@ -133,6 +145,7 @@ async def get_reverse_geocoding(
         response = await client.get(f"{GEO_BASE_URL}/reverse", params=params)
         if response.status_code == 200:
             return [GeocodingResponse(**item) for item in response.json()]
+        _raise_for_unexpected_status(response)
     return None
 
 

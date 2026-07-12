@@ -4,6 +4,13 @@ from typing import IO, Union
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
 
 from app.core.config import settings
+from app.core.errors import (
+    DependencyUnavailable,
+    ErrorCode,
+    ExternalServiceFailed,
+    ValidationFailed,
+)
+from app.infrastructure.providers.gemini import is_gemini_dependency_error
 from app.infrastructure.storage import operations as files
 from app.infrastructure.storage.enums import StorageScope
 from app.infrastructure.storage.errors import StorageError
@@ -46,7 +53,12 @@ async def _generate_embedding(crop_name: str, aliases: list[str] | None) -> list
             _embedding_text(crop_name=crop_name, aliases=aliases)
         )
     except Exception as exc:
-        raise RuntimeError("Failed to generate crop image embedding.") from exc
+        if not is_gemini_dependency_error(exc):
+            raise
+        raise ExternalServiceFailed(
+            "Failed to generate crop image embedding.",
+            code=ErrorCode.AI_PROVIDER_UNAVAILABLE,
+        ) from exc
 
 
 async def upload_new_image(
@@ -57,7 +69,10 @@ async def upload_new_image(
 ) -> CropImageFile:
     normalized_crop_name = crop_name.strip()
     if not normalized_crop_name:
-        raise ValueError("Crop name is required.")
+        raise ValidationFailed(
+            "Crop name is required.",
+            code=ErrorCode.CROP_NAME_REQUIRED,
+        )
 
     normalized_aliases = _normalize_aliases(aliases)
 
@@ -83,7 +98,10 @@ async def upload_new_image(
         )
     except StorageError as exc:
         await crop_image_repository.delete(crop_image.id)
-        raise exc
+        raise DependencyUnavailable(
+            "File storage is temporarily unavailable.",
+            code=ErrorCode.STORAGE_UNAVAILABLE,
+        ) from exc
 
     return crop_image
 

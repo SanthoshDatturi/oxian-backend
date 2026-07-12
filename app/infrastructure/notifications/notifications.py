@@ -45,7 +45,9 @@ def _build_data(request: NotificationRequest) -> dict[str, str]:
         )
 
     if request.data:
-        data["data"] = json.dumps(request.data.model_dump(exclude_none=True, mode="json"))
+        data["data"] = json.dumps(
+            request.data.model_dump(exclude_none=True, mode="json")
+        )
 
     return data
 

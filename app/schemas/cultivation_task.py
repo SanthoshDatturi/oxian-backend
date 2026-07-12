@@ -3,7 +3,14 @@ from enum import Enum, StrEnum
 from typing import List, Optional
 from uuid import uuid4
 
-from pydantic import AliasChoices, BaseModel, Field, ValidationInfo, field_validator, model_validator
+from pydantic import (
+    AliasChoices,
+    BaseModel,
+    Field,
+    ValidationInfo,
+    field_validator,
+    model_validator,
+)
 
 from .generic_types import MoneyValue, TranslatedFields
 

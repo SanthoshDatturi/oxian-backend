@@ -1,5 +1,10 @@
 import logging
 
+from app.core.errors import (
+    CultivationCropNotFound,
+    FarmProfileNotFound,
+    IntercroppingCultivationNotFound,
+)
 from app.repositories import (
     cultivation_crop_repository,
     intercropping_details_repository,
@@ -59,7 +64,7 @@ async def _ensure_farm_access(user_id: str, farm_id: str) -> None:
         farm_id=farm_id,
         user_id=user_id,
     ):
-        raise ValueError(f"Farm profile not found: farm_id={farm_id}")
+        raise FarmProfileNotFound(farm_id)
 
 
 async def has_crop_access(
@@ -222,7 +227,7 @@ async def update_cultivation_crop(
         language=PersistenceLanguage.USER_LANGUAGE,
     )
     if existing is None:
-        raise ValueError("Cultivation crop not found")
+        raise CultivationCropNotFound(crop_id)
     try:
         crop_document = await _build_crop_document(
             user_id=user_id,
@@ -329,7 +334,7 @@ async def update_intercropping_cultivation(
         intercropping_id
     )
     if old_details_document is None:
-        raise ValueError("Intercropping cultivation not found")
+        raise IntercroppingCultivationNotFound(intercropping_id)
     old_crop_documents = (
         await cultivation_crop_repository.list_documents_by_intercropping(
             intercropping_id=intercropping_id,
@@ -337,7 +342,7 @@ async def update_intercropping_cultivation(
         )
     )
     if not old_crop_documents:
-        raise ValueError("Intercropping cultivation not found")
+        raise IntercroppingCultivationNotFound(intercropping_id)
     crop_documents = []
     try:
         details_document = await _build_intercropping_details_document(
@@ -458,6 +463,4 @@ async def _get_intercropping_details(
     *,
     intercropping_id: str,
 ) -> IntercroppingDetailsDocument | None:
-    return await intercropping_details_repository.get_document_by_id(
-        intercropping_id
-    )
+    return await intercropping_details_repository.get_document_by_id(intercropping_id)

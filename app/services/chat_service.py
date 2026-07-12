@@ -17,6 +17,14 @@ from pydantic import ValidationError
 from app.ai.prompts.prompt_manager import PromptManager
 from app.ai.tools.weather import WEATHER_TOOLS
 from app.core.config import settings
+from app.core.errors import (
+    ChatNotFound,
+    DependencyUnavailable,
+    ErrorCode,
+    FarmProfileNotFound,
+    InternalOperationFailed,
+)
+from app.infrastructure.providers.gemini import is_gemini_dependency_error
 from app.infrastructure.storage.enums import StorageEntity
 from app.repositories import (
     chat_repository,
@@ -82,16 +90,27 @@ def _upload_model_file_sync(
     mime_type: str,
     data: bytes,
 ) -> str:
-    with genai.Client() as client:
-        uploaded_file = client.files.upload(
-            file=io.BytesIO(data),
-            config=genai_types.UploadFileConfig(
-                display_name=filename,
-                mime_type=mime_type,
-            ),
-        )
+    try:
+        with genai.Client() as client:
+            uploaded_file = client.files.upload(
+                file=io.BytesIO(data),
+                config=genai_types.UploadFileConfig(
+                    display_name=filename,
+                    mime_type=mime_type,
+                ),
+            )
+    except Exception as exc:
+        if not is_gemini_dependency_error(exc):
+            raise
+        raise DependencyUnavailable(
+            "Gemini file upload is temporarily unavailable.",
+            code=ErrorCode.AI_PROVIDER_UNAVAILABLE,
+        ) from exc
     if not uploaded_file.uri:
-        raise RuntimeError("Gemini file upload did not return a file URI.")
+        raise DependencyUnavailable(
+            "Gemini file upload is temporarily unavailable.",
+            code=ErrorCode.AI_PROVIDER_UNAVAILABLE,
+        )
     return uploaded_file.uri
 
 
@@ -364,7 +383,7 @@ async def _run_turn(
     try:
         process_task = asyncio.current_task()
         if process_task is None:
-            raise RuntimeError("No running task for process execution.")
+            raise InternalOperationFailed("No running task for process execution.")
         process_manager.register(process.id, process_task)
 
         process.status = State.RUNNING
@@ -417,7 +436,7 @@ async def _run_turn(
                     user_id=active_chat.user_id,
                 )
                 if existing_english is None or existing_user_language is None:
-                    raise ValueError("Linked farm profile was not found.")
+                    raise FarmProfileNotFound(active_chat.farm_profile_id)
                 merged_english = _deep_merge(
                     existing_english.model_dump(mode="json", by_alias=False),
                     english.model_dump(mode="json"),
@@ -489,29 +508,45 @@ async def _run_turn(
             content=cast(list[str | dict[str, Any]], model_content)
         )
         agent_input = {"messages": [*history_messages, current_human_message]}
-        async for event in agent.astream_events(agent_input, version="v2"):
-            if event.get("event") != "on_chat_model_stream":
-                continue
-            chunk = event.get("data", {}).get("chunk")
-            if not chunk:
-                continue
-            delta = _extract_chunk_text(chunk)
-            if not delta:
-                continue
-            collected_text += delta
-            await events.put(_sse_event("delta", {"text": delta}))
+        try:
+            async for event in agent.astream_events(agent_input, version="v2"):
+                if event.get("event") != "on_chat_model_stream":
+                    continue
+                chunk = event.get("data", {}).get("chunk")
+                if not chunk:
+                    continue
+                delta = _extract_chunk_text(chunk)
+                if not delta:
+                    continue
+                collected_text += delta
+                await events.put(_sse_event("delta", {"text": delta}))
 
-        if not collected_text.strip():
-            result = await agent.ainvoke(agent_input)
-            messages = result.get("messages", []) if isinstance(result, dict) else []
-            for message in reversed(messages):
-                if isinstance(message, AIMessage):
-                    collected_text = _extract_chunk_text(message) or str(
-                        message.content
-                    )
-                    break
             if not collected_text.strip():
-                raise RuntimeError("Assistant did not produce text output.")
+                result = await agent.ainvoke(agent_input)
+                messages = (
+                    result.get("messages", []) if isinstance(result, dict) else []
+                )
+                for message in reversed(messages):
+                    if isinstance(message, AIMessage):
+                        collected_text = _extract_chunk_text(message) or str(
+                            message.content
+                        )
+                        break
+                if not collected_text.strip():
+                    raise InternalOperationFailed(
+                        "Assistant did not produce text output."
+                    )
+        except DependencyUnavailable:
+            raise
+        except InternalOperationFailed:
+            raise
+        except Exception as exc:
+            if not is_gemini_dependency_error(exc):
+                raise
+            raise DependencyUnavailable(
+                "AI chat service is temporarily unavailable.",
+                code=ErrorCode.AI_PROVIDER_UNAVAILABLE,
+            ) from exc
 
         assistant_parts: list[Any] = [TextPart(text=collected_text)]
         if saved_farm_profile_part is not None:
@@ -541,6 +576,19 @@ async def _run_turn(
             )
         await events.put(_sse_event("message", message_event_data))
         await events.put(_sse_event("done", {}))
+    except DependencyUnavailable as exc:
+        logger.exception(
+            "Dependency unavailable while processing chat turn process_id=%s",
+            process.id,
+        )
+        await _persist_and_emit_turn_error(
+            process=process,
+            assistant_message=assistant_message,
+            events=events,
+            code=str(exc.code),
+            user_message="The AI service is temporarily unavailable. Please try again.",
+            process_message=str(exc.safe_message),
+        )
     except ValidationError:
         logger.exception(
             "Validation error while processing chat turn process_id=%s", process.id
@@ -680,7 +728,7 @@ async def start_existing_chat_turn(
 ) -> ChatStreamSession:
     chat = await chat_repository.get_by_id(chat_id, user_id=user_id)
     if chat is None:
-        raise ValueError("Chat not found.")
+        raise ChatNotFound(chat_id)
 
     user_message, model_content = await _build_user_message(
         user_id=user_id,
@@ -728,7 +776,7 @@ async def start_existing_chat_turn(
 async def stop_chat_turn(*, user_id: str, chat_id: str) -> bool:
     chat = await chat_repository.get_by_id(chat_id, user_id=user_id)
     if chat is None:
-        raise ValueError("Chat not found.")
+        raise ChatNotFound(chat_id)
     if not chat.process_id:
         return False
 
@@ -803,7 +851,7 @@ async def list_chat_messages(
 ) -> list[Message]:
     chat = await get_chat_by_id(user_id=user_id, chat_id=chat_id)
     if chat is None:
-        raise ValueError("Chat not found.")
+        raise ChatNotFound(chat_id)
 
     if since is not None:
         return await message_repository.list_by_chat_since(

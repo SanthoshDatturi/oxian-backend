@@ -10,11 +10,17 @@ from langchain_core.tools import tool
 from langchain_google_genai import ChatGoogleGenerativeAI
 from pydantic import BaseModel, Field
 
+from app.ai.prompts.prompt_manager import PromptManager
 from app.ai.tools.weather import WEATHER_TOOLS
 from app.core.config import settings
-from app.workers.process_manager import process_manager
-from app.workers.queue import enqueue
-from app.ai.prompts.prompt_manager import PromptManager
+from app.core.errors import (
+    CultivationCropNotFound,
+    DependencyUnavailable,
+    ErrorCode,
+    FarmProfileNotFound,
+    InternalOperationFailed,
+)
+from app.infrastructure.providers.gemini import is_gemini_dependency_error
 from app.repositories import (
     process_repository,
 )
@@ -41,6 +47,8 @@ from app.services import (
     investment_breakdown_service,
     translation_service,
 )
+from app.workers.process_manager import process_manager
+from app.workers.queue import enqueue
 
 logger = logging.getLogger(__name__)
 
@@ -119,7 +127,7 @@ async def _run_job(
     try:
         process_task = asyncio.current_task()
         if process_task is None:
-            raise RuntimeError("No running task for process execution.")
+            raise InternalOperationFailed("No running task for process execution.")
         process_manager.register(process.id, process_task)
 
         process.status = State.RUNNING
@@ -131,7 +139,7 @@ async def _run_job(
             user_id=user_id,
         )
         if farm_profile is None:
-            raise ValueError(f"Farm profile not found: farm_id={farm_id}")
+            raise FarmProfileNotFound(farm_id)
 
         farm_profile_json = json.dumps(
             farm_profile.model_dump(
@@ -147,7 +155,7 @@ async def _run_job(
             farm_id=farm_id,
         )
         if crop is None:
-            raise ValueError(f"Crop not found: crop_id={crop_id}")
+            raise CultivationCropNotFound(crop_id)
 
         crop_json = json.dumps(
             crop.model_dump(
@@ -222,6 +230,8 @@ async def _run_job(
                 user_lang_fields = await translation_service.to_user_language(
                     user_id=user_id, fields=english_fields
                 )
+            except DependencyUnavailable:
+                raise
             except Exception:
                 logger.exception("Translation failed for investment breakdown")
                 user_lang_fields = english_fields
@@ -259,6 +269,8 @@ async def _run_job(
                         task_user_lang = await translation_service.to_user_language(
                             user_id=user_id, fields=task_english
                         )
+                    except DependencyUnavailable:
+                        raise
                     except Exception:
                         task_user_lang = task_english
 
@@ -273,6 +285,8 @@ async def _run_job(
                                     user_id=user_id, fields=input_english
                                 )
                             )
+                        except DependencyUnavailable:
+                            raise
                         except Exception:
                             input_user_lang = input_english
 
@@ -386,7 +400,7 @@ async def _run_job(
         await agent.ainvoke({"messages": [user_message]})
 
         if not saved_breakdown or not saved_tasks:
-            raise RuntimeError("Agent did not complete the planning output.")
+            raise InternalOperationFailed("Agent did not complete the planning output.")
 
         try:
             await process_repository.delete(process.id)
@@ -416,6 +430,11 @@ async def _run_job(
             )
         future.cancel()
     except Exception as exc:
+        if is_gemini_dependency_error(exc):
+            exc = DependencyUnavailable(
+                "Planning service is temporarily unavailable.",
+                code=ErrorCode.AI_PROVIDER_UNAVAILABLE,
+            )
         logger.exception("Failed to run crop planning job process_id=%s", process.id)
         process.status = State.FAILED
         process.error = ProcessError(

@@ -4,8 +4,16 @@ from enum import StrEnum
 from langchain_google_genai import ChatGoogleGenerativeAI
 
 from app.core.config import settings
+from app.core.errors import (
+    DependencyUnavailable,
+    ErrorCode,
+    ExternalServiceFailed,
+    MessageNotFound,
+    ValidationFailed,
+)
+from app.infrastructure.providers.gemini import is_gemini_dependency_error
 from app.infrastructure.storage.enums import StorageEntity, StorageScope
-from app.infrastructure.storage.errors import StorageBackendError
+from app.infrastructure.storage.errors import StorageError
 from app.schemas.file import File, FileStatus
 from app.schemas.message import FileMediaKind, FilePart, TextPart
 from app.services import chat_service, storage_service
@@ -28,7 +36,10 @@ def _extract_audio_bytes(audio_payload: object) -> bytes:
         return bytes(audio_payload)
     if isinstance(audio_payload, memoryview):
         return bytes(audio_payload)
-    raise ValueError("TTS model did not return audio bytes.")
+    raise ExternalServiceFailed(
+        "Unable to generate speech audio right now.",
+        code=ErrorCode.AI_PROVIDER_UNAVAILABLE,
+    )
 
 
 async def generate_tts_file(
@@ -44,7 +55,7 @@ async def generate_tts_file(
     if mode == TtsMode.MESSAGE:
         message = await chat_service.get_message(message_id=entity_id, user_id=user_id)
         if message is None:
-            raise ValueError("Message not found.")
+            raise MessageNotFound(entity_id)
 
         # Return existing audio file if already generated
         for part in message.parts:
@@ -57,27 +68,46 @@ async def generate_tts_file(
             if isinstance(part, TextPart) and part.text.strip()
         ]
         if not text_parts:
-            raise ValueError("Message does not contain text to convert to speech.")
+            raise ValidationFailed(
+                "Message does not contain text to convert to speech.",
+                code=ErrorCode.MESSAGE_TTS_UNAVAILABLE,
+                context={"message_id": entity_id},
+            )
 
         tts_input = "\n\n".join(text_parts)
         storage_entity = StorageEntity.CHAT
         storage_entity_id = message.chat_id
     elif mode == TtsMode.CROP:
-        raise ValueError("Crop TTS is not supported yet.")
+        raise ValidationFailed(
+            "Crop TTS is not supported yet.",
+            code=ErrorCode.CROP_TTS_UNSUPPORTED,
+        )
     else:
-        raise ValueError("Unsupported TTS mode.")
+        raise ValidationFailed(
+            "Unsupported TTS mode.",
+            code=ErrorCode.UNSUPPORTED_TTS_MODE,
+            context={"mode": mode},
+        )
 
-    tts_response = await ChatGoogleGenerativeAI(
-        model=settings.GEMINI_TTS_MODEL,
-        response_modalities=["AUDIO"],
-    ).ainvoke(
-        tts_input,
-        speech_config={
-            "voice_config": {
-                "prebuilt_voice_config": {"voice_name": TTS_VOICE_NAME}
-            }
-        },
-    )
+    try:
+        tts_response = await ChatGoogleGenerativeAI(
+            model=settings.GEMINI_TTS_MODEL,
+            response_modalities=["AUDIO"],
+        ).ainvoke(
+            tts_input,
+            speech_config={
+                "voice_config": {
+                    "prebuilt_voice_config": {"voice_name": TTS_VOICE_NAME}
+                }
+            },
+        )
+    except Exception as exc:
+        if not is_gemini_dependency_error(exc):
+            raise
+        raise DependencyUnavailable(
+            "AI TTS service is temporarily unavailable.",
+            code=ErrorCode.AI_PROVIDER_UNAVAILABLE,
+        ) from exc
 
     audio_payload = tts_response.additional_kwargs.get("audio")
     audio_bytes = _extract_audio_bytes(audio_payload)
@@ -91,10 +121,16 @@ async def generate_tts_file(
         status=FileStatus.ACTIVE,
     )
 
-    await storage_service._upload_file(
-        file_stream=audio_bytes,
-        stored_file=stored_file,
-    )
+    try:
+        await storage_service._upload_file(
+            file_stream=audio_bytes,
+            stored_file=stored_file,
+        )
+    except StorageError as exc:
+        raise DependencyUnavailable(
+            "File storage is temporarily unavailable.",
+            code=ErrorCode.STORAGE_UNAVAILABLE,
+        ) from exc
 
     if mode == TtsMode.MESSAGE:
         message.parts.append(
@@ -114,8 +150,9 @@ async def generate_tts_file(
                     stored_file.id,
                     entity_id,
                 )
-            raise StorageBackendError(
-                "Failed to update message with generated audio."
+            raise DependencyUnavailable(
+                "File storage is temporarily unavailable.",
+                code=ErrorCode.STORAGE_UNAVAILABLE,
             ) from exc
 
     return stored_file.id

@@ -4,6 +4,11 @@ from pymongo import ASCENDING, ReturnDocument
 
 from app.infrastructure.database.collections import get_files_collection
 from app.infrastructure.storage.enums import StorageEntity
+from app.repositories.errors import (
+    EntityNotFoundError,
+    InvalidEntityError,
+    InvalidFileStateError,
+)
 from app.schemas.file import File, FileStatus
 
 
@@ -20,20 +25,20 @@ def _dedupe_file_ids(file_ids: list[str]) -> list[str]:
 
 async def _validate_entity(entity: StorageEntity, entity_id: str, user_id: str) -> None:
     if not entity_id:
-        raise ValueError("Entity id is required.")
+        raise InvalidEntityError("Entity id is required.")
 
     if entity == StorageEntity.CHAT:
         from app.repositories import chat_repository
 
         chat = await chat_repository.get_by_id(entity_id, user_id=user_id)
         if chat is None:
-            raise ValueError("Chat not found.")
+            raise EntityNotFoundError("Chat not found.")
         return
 
     if entity == StorageEntity.CROP:
-        raise ValueError("Crop file activation is not supported.")
+        raise InvalidEntityError("Crop file activation is not supported.")
 
-    raise ValueError("Unsupported storage entity.")
+    raise InvalidEntityError("Unsupported storage entity.")
 
 
 async def create(file: File) -> File:
@@ -45,9 +50,9 @@ async def create(file: File) -> File:
 
 async def save_active_file(file: File, entity: StorageEntity) -> File:
     if file.status != FileStatus.ACTIVE:
-        raise ValueError("File must be active.")
+        raise InvalidFileStateError("File must be active.")
     if not file.entity_id:
-        raise ValueError("Entity id is required.")
+        raise InvalidEntityError("Entity id is required.")
 
     await _validate_entity(
         entity=entity, entity_id=file.entity_id, user_id=file.user_id
@@ -101,13 +106,13 @@ async def activate_for_entity(
 
     missing_ids = [file_id for file_id in normalized_ids if file_id not in files_by_id]
     if missing_ids:
-        raise ValueError("One or more files were not found.")
+        raise EntityNotFoundError("One or more files were not found.")
 
     for file in files:
         if file.status == FileStatus.DELETING:
-            raise ValueError("File is being deleted.")
+            raise InvalidFileStateError("File is being deleted.")
         if file.entity_id and file.entity_id != entity_id:
-            raise ValueError("File is already attached to another entity.")
+            raise InvalidFileStateError("File is already attached to another entity.")
 
     await get_files_collection().update_many(
         {"_id": {"$in": normalized_ids}, "user_id": user_id},

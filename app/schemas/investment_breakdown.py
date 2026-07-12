@@ -113,7 +113,9 @@ class InvestmentBreakdownTranslatableFields(BaseModel):
             raise ValueError(
                 "Estimated total cost must equal the sum of investment costs"
             )
-        if not isclose(net_profit.amount, gross_income.amount - total_cost_value.amount):
+        if not isclose(
+            net_profit.amount, gross_income.amount - total_cost_value.amount
+        ):
             raise ValueError(
                 "Estimated net profit must equal gross income minus total cost"
             )

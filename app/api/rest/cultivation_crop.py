@@ -1,6 +1,7 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Query
 
-from app.core.security import authenticate_rest
+from app.api.dependencies import get_current_user_id
+from app.core.errors import CultivationCropNotFound, IntercroppingCultivationNotFound
 from app.schemas.cultivation_crop import (
     CultivationCrop,
     CultivationCropInput,
@@ -13,28 +14,17 @@ from app.services.crop_planning_service import CropPlan, generate_crop_plan
 router = APIRouter(prefix="/cultivation-crops", tags=["Cultivation Crops"])
 
 
-def _get_user_id(user_payload: dict) -> str:
-    user_id = user_payload.get("uid") or user_payload.get("sub")
-    if not user_id:
-        raise HTTPException(status_code=401, detail="Invalid authentication token")
-    return user_id
-
-
 @router.get("/farms/{farm_id}", response_model=list[CultivationCrop])
 async def list_cultivation_crops(
     farm_id: str,
     limit: int = Query(default=100, ge=1, le=100),
-    user_payload: dict = Depends(authenticate_rest),
+    user_id: str = Depends(get_current_user_id),
 ) -> list[CultivationCrop]:
-    user_id = _get_user_id(user_payload)
-    try:
-        return await cultivation_crop_service.list_cultivation_crops(
-            user_id=user_id,
-            farm_id=farm_id,
-            limit=limit,
-        )
-    except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc))
+    return await cultivation_crop_service.list_cultivation_crops(
+        user_id=user_id,
+        farm_id=farm_id,
+        limit=limit,
+    )
 
 
 @router.post(
@@ -45,17 +35,13 @@ async def list_cultivation_crops(
 async def create_cultivation_crop(
     farm_id: str,
     input: CultivationCropInput,
-    user_payload: dict = Depends(authenticate_rest),
+    user_id: str = Depends(get_current_user_id),
 ) -> CultivationCrop:
-    user_id = _get_user_id(user_payload)
-    try:
-        return await cultivation_crop_service.create_cultivation_crop(
-            user_id=user_id,
-            farm_id=farm_id,
-            input=input,
-        )
-    except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc))
+    return await cultivation_crop_service.create_cultivation_crop(
+        user_id=user_id,
+        farm_id=farm_id,
+        input=input,
+    )
 
 
 @router.get(
@@ -65,19 +51,15 @@ async def create_cultivation_crop(
 async def get_cultivation_crop(
     farm_id: str,
     crop_id: str,
-    user_payload: dict = Depends(authenticate_rest),
+    user_id: str = Depends(get_current_user_id),
 ) -> CultivationCrop:
-    user_id = _get_user_id(user_payload)
-    try:
-        crop = await cultivation_crop_service.get_cultivation_crop(
-            user_id=user_id,
-            farm_id=farm_id,
-            crop_id=crop_id,
-        )
-    except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc))
+    crop = await cultivation_crop_service.get_cultivation_crop(
+        user_id=user_id,
+        farm_id=farm_id,
+        crop_id=crop_id,
+    )
     if crop is None:
-        raise HTTPException(status_code=404, detail="Cultivation crop not found")
+        raise CultivationCropNotFound(crop_id)
     return crop
 
 
@@ -89,37 +71,29 @@ async def update_cultivation_crop(
     farm_id: str,
     crop_id: str,
     input: CultivationCropInput,
-    user_payload: dict = Depends(authenticate_rest),
+    user_id: str = Depends(get_current_user_id),
 ) -> CultivationCrop:
-    user_id = _get_user_id(user_payload)
-    try:
-        return await cultivation_crop_service.update_cultivation_crop(
-            user_id=user_id,
-            farm_id=farm_id,
-            crop_id=crop_id,
-            input=input,
-        )
-    except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc))
+    return await cultivation_crop_service.update_cultivation_crop(
+        user_id=user_id,
+        farm_id=farm_id,
+        crop_id=crop_id,
+        input=input,
+    )
 
 
 @router.delete("/farms/{farm_id}/{crop_id}", status_code=204)
 async def delete_cultivation_crop(
     farm_id: str,
     crop_id: str,
-    user_payload: dict = Depends(authenticate_rest),
+    user_id: str = Depends(get_current_user_id),
 ):
-    user_id = _get_user_id(user_payload)
-    try:
-        deleted = await cultivation_crop_service.delete_cultivation_crop(
-            user_id=user_id,
-            farm_id=farm_id,
-            crop_id=crop_id,
-        )
-    except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc))
+    deleted = await cultivation_crop_service.delete_cultivation_crop(
+        user_id=user_id,
+        farm_id=farm_id,
+        crop_id=crop_id,
+    )
     if not deleted:
-        raise HTTPException(status_code=404, detail="Cultivation crop not found")
+        raise CultivationCropNotFound(crop_id)
     return
 
 
@@ -131,17 +105,13 @@ async def delete_cultivation_crop(
 async def create_intercropping_cultivation(
     farm_id: str,
     input: IntercroppingCultivationInput,
-    user_payload: dict = Depends(authenticate_rest),
+    user_id: str = Depends(get_current_user_id),
 ) -> IntercroppingCultivation:
-    user_id = _get_user_id(user_payload)
-    try:
-        return await cultivation_crop_service.create_intercropping_cultivation(
-            user_id=user_id,
-            farm_id=farm_id,
-            input=input,
-        )
-    except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc))
+    return await cultivation_crop_service.create_intercropping_cultivation(
+        user_id=user_id,
+        farm_id=farm_id,
+        input=input,
+    )
 
 
 @router.put(
@@ -152,40 +122,29 @@ async def update_intercropping_cultivation(
     farm_id: str,
     intercropping_id: str,
     input: IntercroppingCultivationInput,
-    user_payload: dict = Depends(authenticate_rest),
+    user_id: str = Depends(get_current_user_id),
 ) -> IntercroppingCultivation:
-    user_id = _get_user_id(user_payload)
-    try:
-        return await cultivation_crop_service.update_intercropping_cultivation(
-            user_id=user_id,
-            farm_id=farm_id,
-            intercropping_id=intercropping_id,
-            input=input,
-        )
-    except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc))
+    return await cultivation_crop_service.update_intercropping_cultivation(
+        user_id=user_id,
+        farm_id=farm_id,
+        intercropping_id=intercropping_id,
+        input=input,
+    )
 
 
 @router.delete("/farms/{farm_id}/intercropping/{intercropping_id}", status_code=204)
 async def delete_intercropping_cultivation(
     farm_id: str,
     intercropping_id: str,
-    user_payload: dict = Depends(authenticate_rest),
+    user_id: str = Depends(get_current_user_id),
 ):
-    user_id = _get_user_id(user_payload)
-    try:
-        deleted = await cultivation_crop_service.delete_intercropping_cultivation(
-            user_id=user_id,
-            farm_id=farm_id,
-            intercropping_id=intercropping_id,
-        )
-    except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc))
+    deleted = await cultivation_crop_service.delete_intercropping_cultivation(
+        user_id=user_id,
+        farm_id=farm_id,
+        intercropping_id=intercropping_id,
+    )
     if not deleted:
-        raise HTTPException(
-            status_code=404,
-            detail="Intercropping cultivation not found",
-        )
+        raise IntercroppingCultivationNotFound(intercropping_id)
     return
 
 
@@ -197,14 +156,10 @@ async def delete_intercropping_cultivation(
 async def create_crop_plan(
     farm_id: str,
     crop_id: str,
-    user_payload: dict = Depends(authenticate_rest),
+    user_id: str = Depends(get_current_user_id),
 ) -> CropPlan:
-    user_id = _get_user_id(user_payload)
-    try:
-        return await generate_crop_plan(
-            user_id=user_id,
-            farm_id=farm_id,
-            crop_id=crop_id,
-        )
-    except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc))
+    return await generate_crop_plan(
+        user_id=user_id,
+        farm_id=farm_id,
+        crop_id=crop_id,
+    )

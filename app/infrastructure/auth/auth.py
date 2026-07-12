@@ -4,7 +4,6 @@ from firebase_admin import exceptions as firebase_exceptions
 
 from app.infrastructure.providers.firebase import initialize_firebase
 
-
 # ── Errors ──────────────────────────────────────────────────────────
 
 

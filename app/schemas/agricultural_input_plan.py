@@ -55,7 +55,7 @@ class AgriculturalInputStrategy(BaseModel):
     )
     rank: int = Field(
         ge=1,
-        description="Suitability ranking where 1 is best, unique for each strategy in the recommendation."
+        description="Suitability ranking where 1 is best, unique for each strategy in the recommendation.",
     )
     inputs: List[AgriculturalInputItem] = Field(
         min_length=1,

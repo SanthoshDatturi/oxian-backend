@@ -4,8 +4,10 @@ from typing import TypeVar
 from langchain_google_genai import ChatGoogleGenerativeAI
 from pydantic import BaseModel
 
-from app.core.config import settings
 from app.ai.prompts.prompt_manager import PromptManager
+from app.core.config import settings
+from app.core.errors import DependencyUnavailable, ErrorCode
+from app.infrastructure.providers.gemini import is_gemini_dependency_error
 from app.repositories import user_pref_repository
 
 T = TypeVar("T", bound=BaseModel)
@@ -32,16 +34,25 @@ async def _translate_model(
         temperature=0,
     ).with_structured_output(model_type)
 
-    response = await model.ainvoke(
-        PromptManager.get_prompt(
-            "translation",
-            source_language=source_language,
-            target_language=target_language,
-            user_preference_json=await _get_user_preference_json(user_id),
-            data_json=json.dumps(fields.model_dump(mode="json"), indent=2),
-            output_schema_json=json.dumps(model_type.model_json_schema(), indent=2),
+    try:
+        response = await model.ainvoke(
+            PromptManager.get_prompt(
+                "translation",
+                source_language=source_language,
+                target_language=target_language,
+                user_preference_json=await _get_user_preference_json(user_id),
+                data_json=json.dumps(fields.model_dump(mode="json"), indent=2),
+                output_schema_json=json.dumps(model_type.model_json_schema(), indent=2),
+            )
         )
-    )
+    except Exception as exc:
+        if not is_gemini_dependency_error(exc):
+            raise
+        raise DependencyUnavailable(
+            "Translation service is temporarily unavailable.",
+            code=ErrorCode.AI_PROVIDER_UNAVAILABLE,
+        ) from exc
+
     return model_type.model_validate(response)
 
 

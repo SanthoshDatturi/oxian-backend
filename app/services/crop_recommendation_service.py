@@ -10,11 +10,18 @@ from langchain_core.tools import tool
 from langchain_google_genai import ChatGoogleGenerativeAI
 from pydantic import BaseModel, Field
 
+from app.ai.prompts.prompt_manager import PromptManager
 from app.ai.tools.weather import WEATHER_TOOLS
 from app.core.config import settings
-from app.workers.process_manager import process_manager
-from app.workers.queue import enqueue
-from app.ai.prompts.prompt_manager import PromptManager
+from app.core.errors import (
+    CropRecommendationNotFound,
+    DependencyUnavailable,
+    ErrorCode,
+    FarmProfileNotFound,
+    InternalOperationFailed,
+    ValidationFailed,
+)
+from app.infrastructure.providers.gemini import is_gemini_dependency_error
 from app.repositories import (
     crop_recommendation_repository,
     farm_profile_repository,
@@ -50,6 +57,8 @@ from app.services import (
     notification_service,
     translation_service,
 )
+from app.workers.process_manager import process_manager
+from app.workers.queue import enqueue
 
 logger = logging.getLogger(__name__)
 
@@ -150,6 +159,8 @@ async def search_crop_images(
     try:
         results = await crop_image_service.crops_image_search(crop_names)
         return [r.model_dump(mode="json") for r in results if r is not None]
+    except DependencyUnavailable:
+        raise
     except Exception:
         logger.exception("search_crop_images failed for crop_names=%s", crop_names)
         return [
@@ -176,6 +187,8 @@ async def request_crop_image_generation(
             crop_name=crop_name,
             aliases=aliases,
         )
+    except DependencyUnavailable:
+        raise
     except Exception:
         logger.exception(
             "request_crop_image_generation failed for crop_name=%s", crop_name
@@ -247,7 +260,7 @@ async def _run_job(
     try:
         process_task = asyncio.current_task()
         if process_task is None:
-            raise RuntimeError("No running task for process execution.")
+            raise InternalOperationFailed("No running task for process execution.")
         process_manager.register(process.id, process_task)
 
         process.status = State.RUNNING
@@ -260,7 +273,7 @@ async def _run_job(
             user_id=user_id,
         )
         if farm_profile is None:
-            raise ValueError(f"Farm profile not found: farm_id={farm_id}")
+            raise FarmProfileNotFound(farm_id)
 
         farm_profile_json = json.dumps(
             farm_profile.model_dump(
@@ -325,6 +338,8 @@ async def _run_job(
                 user_language_fields = await translation_service.to_user_language(
                     user_id=user_id, fields=english_fields
                 )
+            except DependencyUnavailable:
+                raise
             except Exception:
                 logger.exception(
                     "Translation failed for farm_id=%s; using English for both slots.",
@@ -375,7 +390,9 @@ async def _run_job(
         await agent.ainvoke({"messages": [user_message]})
 
         if saved_recommendation is None:
-            raise RuntimeError("Agent did not call save_crop_recommendation tool.")
+            raise InternalOperationFailed(
+                "Agent did not call save_crop_recommendation tool."
+            )
 
         try:
             await process_repository.delete(process.id)
@@ -408,6 +425,11 @@ async def _run_job(
             )
         future.cancel()
     except Exception as exc:
+        if is_gemini_dependency_error(exc):
+            exc = DependencyUnavailable(
+                "Recommendation service is temporarily unavailable.",
+                code=ErrorCode.AI_PROVIDER_UNAVAILABLE,
+            )
         logger.exception(
             "Failed to run crop recommendation job process_id=%s", process.id
         )
@@ -470,7 +492,7 @@ async def generate_crop_recommendation(
     Creates a Process, enqueues the job, and awaits the result.
     """
     if not await farm_profile_service.has_farm_access(farm_id=farm_id, user_id=user_id):
-        raise ValueError(f"Farm profile not found: farm_id={farm_id}")
+        raise FarmProfileNotFound(farm_id)
 
     process = Process(status=State.PENDING)
     process = await process_repository.create(process)
@@ -507,7 +529,7 @@ async def get_recommendation(
     if not await farm_profile_service.has_farm_access(
         farm_id=recommendation.farm_id, user_id=user_id
     ):
-        raise ValueError(f"Farm profile not found: farm_id={recommendation.farm_id}")
+        raise FarmProfileNotFound(recommendation.farm_id)
 
     return recommendation
 
@@ -555,7 +577,7 @@ async def delete_recommendation(
     if not farm_id:
         return False
     if not await farm_profile_service.has_farm_access(farm_id=farm_id, user_id=user_id):
-        raise ValueError(f"Farm profile not found: farm_id={farm_id}")
+        raise FarmProfileNotFound(farm_id)
 
     return await crop_recommendation_repository.delete(
         recommendation_id=recommendation_id,
@@ -566,7 +588,7 @@ async def delete_recommendation(
 async def delete_all_recommendations_for_farm(*, user_id: str, farm_id: str) -> int:
     """Delete all crop recommendations for a farm. Returns count deleted."""
     if not await farm_profile_service.has_farm_access(farm_id=farm_id, user_id=user_id):
-        raise ValueError(f"Farm profile not found: farm_id={farm_id}")
+        raise FarmProfileNotFound(farm_id)
 
     return await crop_recommendation_repository.delete_all_by_farm(farm_id=farm_id)
 
@@ -586,13 +608,13 @@ async def select_mono_crop_from_recommendation(
         farm_id=farm_id,
         user_id=user_id,
     ):
-        raise ValueError(f"Farm profile not found: farm_id={farm_id}")
+        raise FarmProfileNotFound(farm_id)
 
     doc = await crop_recommendation_repository.get_document_by_id(
         recommendation_id=recommendation_id,
     )
     if not doc:
-        raise ValueError("Recommendation not found")
+        raise CropRecommendationNotFound(recommendation_id)
 
     # Search in mono crop candidates
     for candidate_idx, candidate in enumerate(doc.english.mono_crop_candidates):
@@ -614,8 +636,10 @@ async def select_mono_crop_from_recommendation(
             )
             return saved_crop
 
-    raise ValueError(
-        f"Mono crop candidate {crop_id} not found in recommendation {recommendation_id}"
+    raise ValidationFailed(
+        "Selected crop was not found in the recommendation.",
+        code=ErrorCode.CROP_SELECTION_INVALID,
+        context={"crop_id": crop_id, "recommendation_id": recommendation_id},
     )
 
 
@@ -635,13 +659,13 @@ async def select_intercrop_from_recommendation(
         farm_id=farm_id,
         user_id=user_id,
     ):
-        raise ValueError(f"Farm profile not found: farm_id={farm_id}")
+        raise FarmProfileNotFound(farm_id)
 
     doc = await crop_recommendation_repository.get_document_by_id(
         recommendation_id=recommendation_id,
     )
     if not doc:
-        raise ValueError("Recommendation not found")
+        raise CropRecommendationNotFound(recommendation_id)
 
     selected_areas = {req.crop_id: req.selected_area for req in payload}
 
@@ -672,7 +696,14 @@ async def select_intercrop_from_recommendation(
                 user_lang_component = user_lang_candidate.crops[comp_idx]
                 area = selected_areas.get(component.id)
                 if not area:
-                    raise ValueError(f"Selected area missing for crop {component.id}")
+                    raise ValidationFailed(
+                        "Selected area is required for each crop.",
+                        code=ErrorCode.SELECTED_AREA_REQUIRED,
+                        context={
+                            "crop_id": component.id,
+                            "recommendation_id": recommendation_id,
+                        },
+                    )
 
                 cultivation_crop = CultivationCropDocument(
                     id=component.id,
@@ -692,6 +723,8 @@ async def select_intercrop_from_recommendation(
 
             return saved_crops, saved_details
 
-    raise ValueError(
-        f"Intercrop candidate {intercrop_id} not found in recommendation {recommendation_id}"
+    raise ValidationFailed(
+        "Selected intercrop was not found in the recommendation.",
+        code=ErrorCode.CROP_SELECTION_INVALID,
+        context={"intercrop_id": intercrop_id, "recommendation_id": recommendation_id},
     )

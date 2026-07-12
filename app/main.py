@@ -5,6 +5,7 @@ from contextlib import asynccontextmanager, suppress
 from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 
+from app.api.error_handlers import register_error_handlers
 from app.api.router import api_router
 from app.infrastructure.providers.mongodb import close_mongo_client, init_mongo_client
 from app.repositories import (
@@ -34,6 +35,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(lifespan=lifespan)
+register_error_handlers(app)
 
 app.mount("/static", StaticFiles(directory="app/public/static"), name="static")
 

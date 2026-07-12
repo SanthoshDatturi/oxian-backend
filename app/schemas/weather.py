@@ -155,7 +155,9 @@ class ForecastResponse(BaseModel):
 class AirQualityIndex(BaseModel):
     """Air Quality Index (AQI)."""
 
-    aqi: int = Field(description="Air Quality Index: 1=Good, 2=Fair, 3=Moderate, 4=Poor, 5=Very Poor")
+    aqi: int = Field(
+        description="Air Quality Index: 1=Good, 2=Fair, 3=Moderate, 4=Poor, 5=Very Poor"
+    )
 
 
 class PollutantConcentration(BaseModel):

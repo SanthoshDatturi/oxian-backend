@@ -3,20 +3,35 @@ from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from typing import IO, Union
 
+from app.core.errors import (
+    DependencyUnavailable,
+    ErrorCode,
+    ValidationFailed,
+)
+from app.core.errors import (
+    FileNotFound as FileNotFoundAppError,
+)
 from app.infrastructure.storage import operations as files
 from app.infrastructure.storage.enums import StorageEntity, StorageScope
 from app.infrastructure.storage.errors import (
     StorageBackendError,
     StorageDeleteError,
     StorageNotFoundError,
-    StorageUploadError,
 )
 from app.repositories import files_repository
+from app.repositories.errors import RepositoryError
 from app.schemas.file import File, FileStatus
 
 logger = logging.getLogger(__name__)
 
 TEMP_FILE_RETENTION = timedelta(hours=5)
+
+
+def _storage_unavailable() -> DependencyUnavailable:
+    return DependencyUnavailable(
+        "File storage is temporarily unavailable.",
+        code=ErrorCode.STORAGE_UNAVAILABLE,
+    )
 
 
 async def _delete_blob_if_exists(file: File) -> bool:
@@ -46,7 +61,7 @@ async def create_upload_url(
     try:
         await files_repository.create(stored_file)
     except Exception as exc:
-        raise StorageBackendError("Failed to persist file metadata.") from exc
+        raise _storage_unavailable() from exc
 
     try:
         upload_url = await files.generate_upload_url(
@@ -62,7 +77,7 @@ async def create_upload_url(
                 stored_file.id,
                 stored_file.user_id,
             )
-        raise StorageBackendError("Failed to generate upload url.") from exc
+        raise _storage_unavailable() from exc
 
     return stored_file.id, upload_url
 
@@ -73,7 +88,7 @@ async def generate_download_url(file_id: str, user_id: str) -> str:
     """
     stored_file = await files_repository.get_by_id(file_id=file_id, user_id=user_id)
     if stored_file is None or stored_file.status == FileStatus.DELETING:
-        raise StorageNotFoundError("File not found.")
+        raise FileNotFoundAppError(file_id)
 
     try:
         download_url = await files.generate_download_url(
@@ -81,7 +96,7 @@ async def generate_download_url(file_id: str, user_id: str) -> str:
             scope=stored_file.storage_scope,
         )
     except Exception as exc:
-        raise StorageBackendError("Failed to generate download url.") from exc
+        raise _storage_unavailable() from exc
 
     return download_url
 
@@ -169,9 +184,12 @@ async def delete_file(file_id: str, user_id: str) -> None:
         user_id=user_id,
     )
     if stored_file is None:
-        raise StorageNotFoundError("File not found.")
+        raise FileNotFoundAppError(file_id)
 
-    await _delete_files([stored_file])
+    try:
+        await _delete_files([stored_file])
+    except StorageDeleteError as exc:
+        raise _storage_unavailable() from exc
 
 
 async def _delete_files_by_entity(entity_id: str, user_id: str) -> None:
@@ -221,8 +239,11 @@ async def _activate_files(
                 )
 
         return activated_files
-    except ValueError as exc:
-        raise StorageUploadError(str(exc)) from exc
+    except RepositoryError as exc:
+        raise ValidationFailed(
+            str(exc),
+            code=ErrorCode.INVALID_FILE_STATE,
+        ) from exc
 
 
 async def download_file(file_id: str, user_id: str) -> tuple[File, bytes]:
@@ -231,7 +252,7 @@ async def download_file(file_id: str, user_id: str) -> tuple[File, bytes]:
     """
     stored_file = await files_repository.get_by_id(file_id=file_id, user_id=user_id)
     if stored_file is None or stored_file.status == FileStatus.DELETING:
-        raise StorageNotFoundError("File not found.")
+        raise FileNotFoundAppError(file_id)
 
     return await _download_file(stored_file)
 
@@ -241,11 +262,11 @@ async def _download_file(stored_file: File) -> tuple[File, bytes]:
     Private download API for callers that already validated the File object.
     """
     if stored_file.status == FileStatus.DELETING:
-        raise StorageNotFoundError("File not found.")
+        raise FileNotFoundAppError(stored_file.id)
 
     data = await files.download(file_id=stored_file.id, scope=stored_file.storage_scope)
     if data is None:
-        raise StorageNotFoundError("File data not found in storage backend.")
+        raise FileNotFoundAppError(stored_file.id)
 
     return stored_file, data
 

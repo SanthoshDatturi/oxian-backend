@@ -105,7 +105,9 @@ async def get_by_crop_id(
 async def get_document_by_crop_id(
     crop_id: str,
 ) -> InvestmentBreakdownDocument | None:
-    document = await get_investment_breakdowns_collection().find_one({"crop_id": crop_id})
+    document = await get_investment_breakdowns_collection().find_one(
+        {"crop_id": crop_id}
+    )
     if not document:
         return None
     return InvestmentBreakdownDocument.model_validate(document)
@@ -130,5 +132,7 @@ async def delete(breakdown_id: str, crop_id: str | None = None) -> bool:
 
 
 async def delete_all_by_crop(crop_id: str) -> int:
-    result = await get_investment_breakdowns_collection().delete_many({"crop_id": crop_id})
+    result = await get_investment_breakdowns_collection().delete_many(
+        {"crop_id": crop_id}
+    )
     return result.deleted_count

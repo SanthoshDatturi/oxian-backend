@@ -13,16 +13,24 @@ async def ensure_indexes() -> None:
     device_collection = get_device_registrations_collection()
     existing_indexes = await device_collection.index_information()
     for index_name, index_info in existing_indexes.items():
-        if index_info.get("key") == [("device_token", ASCENDING)] and index_info.get("unique"):
+        if index_info.get("key") == [("device_token", ASCENDING)] and index_info.get(
+            "unique"
+        ):
             await device_collection.drop_index(index_name)
     await device_collection.create_index(
         [("device_token", ASCENDING)],
     )
-    await device_collection.create_index([("user_id", ASCENDING), ("registered_at", DESCENDING)])
+    await device_collection.create_index(
+        [("user_id", ASCENDING), ("registered_at", DESCENDING)]
+    )
 
     notification_collection = get_notification_records_collection()
-    await notification_collection.create_index([("user_id", ASCENDING), ("created_at", DESCENDING)])
-    await notification_collection.create_index([("delivery_status", ASCENDING), ("created_at", DESCENDING)])
+    await notification_collection.create_index(
+        [("user_id", ASCENDING), ("created_at", DESCENDING)]
+    )
+    await notification_collection.create_index(
+        [("delivery_status", ASCENDING), ("created_at", DESCENDING)]
+    )
 
 
 def _to_document(model: Any) -> dict[str, Any]:

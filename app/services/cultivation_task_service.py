@@ -21,9 +21,7 @@ async def list_cultivation_tasks(
     )
 
 
-async def get_cultivation_task(
-    *, task_id: str, user_id: str
-) -> CultivationTask | None:
+async def get_cultivation_task(*, task_id: str, user_id: str) -> CultivationTask | None:
     crop_id = await cultivation_task_repository.get_crop_id_by_id(task_id)
     if not crop_id or not await cultivation_crop_service.has_crop_access(
         user_id=user_id, crop_id=crop_id
@@ -45,7 +43,9 @@ async def delete_cultivation_task(*, task_id: str, user_id: str) -> bool:
     return await cultivation_task_repository.delete(task_id=task_id, crop_id=crop_id)
 
 
-async def _list_cultivation_tasks(crop_id: str, limit: int = 100) -> list[CultivationTask]:
+async def _list_cultivation_tasks(
+    crop_id: str, limit: int = 100
+) -> list[CultivationTask]:
     return await cultivation_task_repository.list_by_crop(
         crop_id=crop_id,
         language=PersistenceLanguage.ENGLISH,

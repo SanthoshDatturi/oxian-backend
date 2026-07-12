@@ -6,6 +6,7 @@ from pymongo.errors import OperationFailure
 
 from app.core.config import settings
 from app.infrastructure.database.collections import get_crop_images_collection
+from app.repositories.errors import InvalidEntityError
 from app.schemas.crop_image import CropImageFile, RetrievedCropImageFile
 
 EMBEDDING_VECTOR_INDEX_NAME = "crop_image_embedding_vector_index"
@@ -67,14 +68,16 @@ async def ensure_indexes() -> None:
 
 def _validate_embedding_dimension(embedding: list[float]) -> None:
     if len(embedding) != settings.CROP_IMAGE_EMBEDDING_DIMENSION:
-        raise ValueError("Embedding dimension mismatch")
+        raise InvalidEntityError("Embedding dimension mismatch")
 
 
 def _model_to_document(crop_image: CropImageFile) -> dict[str, Any]:
     return crop_image.model_dump(by_alias=True, exclude_none=True, mode="json")
 
 
-def _document_to_retrieved_crop_image(document: dict[str, Any]) -> RetrievedCropImageFile:
+def _document_to_retrieved_crop_image(
+    document: dict[str, Any],
+) -> RetrievedCropImageFile:
     return RetrievedCropImageFile.model_validate(document)
 
 
@@ -115,7 +118,9 @@ async def get_many_by_ids(crop_image_ids: list[str]) -> list[RetrievedCropImageF
         {"_id": {"$in": normalized_ids}},
         CROP_IMAGE_RETRIEVAL_PROJECTION,
     )
-    crop_images = [_document_to_retrieved_crop_image(document) async for document in cursor]
+    crop_images = [
+        _document_to_retrieved_crop_image(document) async for document in cursor
+    ]
     crop_images_by_id = {crop_image.id: crop_image for crop_image in crop_images}
     return [
         crop_images_by_id[crop_image_id]
@@ -186,7 +191,8 @@ async def keyword_search(query: str, limit: int = 2) -> list[RetrievedCropImageF
             .limit(limit)
         )
         text_matches = [
-            _document_to_retrieved_crop_image(document) async for document in text_cursor
+            _document_to_retrieved_crop_image(document)
+            async for document in text_cursor
         ]
         if text_matches:
             return text_matches

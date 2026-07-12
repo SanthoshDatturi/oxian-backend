@@ -1,10 +1,20 @@
 import logging
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Query
 
-from app.core.security import authenticate_rest
+from app.api.dependencies import get_current_user_id
+from app.core.errors import (
+    DependencyUnavailable,
+    ErrorCode,
+    ExternalServiceFailed,
+    WeatherDataNotFound,
+)
 from app.infrastructure.weather import open_weather
+from app.infrastructure.weather.errors import (
+    WeatherConfigurationError,
+    WeatherProviderError,
+)
 from app.schemas.weather import (
     AirPollutionResponse,
     CurrentWeatherResponse,
@@ -16,27 +26,20 @@ router = APIRouter(prefix="/weather", tags=["Weather"])
 logger = logging.getLogger(__name__)
 
 
-def _get_user_id(user_payload: dict) -> str:
-    user_id = user_payload.get("uid") or user_payload.get("sub")
-    if not user_id:
-        raise HTTPException(status_code=401, detail="Invalid authentication token")
-    return user_id
-
-
-async def _fetch_weather_data(fetcher, not_found_detail: str, *args):
+async def _fetch_weather_data(fetcher, *args):
     try:
         result = await fetcher(*args)
-    except ValueError as exc:
-        raise HTTPException(status_code=503, detail=str(exc))
-    except httpx.HTTPError:
+    except WeatherConfigurationError as exc:
+        raise DependencyUnavailable(
+            "Weather service is temporarily unavailable.",
+            code=ErrorCode.DEPENDENCY_UNAVAILABLE,
+        ) from exc
+    except (WeatherProviderError, httpx.HTTPError) as exc:
         logger.exception("OpenWeather request failed.")
-        raise HTTPException(
-            status_code=502,
-            detail="Unable to fetch weather data right now.",
-        )
+        raise ExternalServiceFailed("Unable to fetch weather data right now.") from exc
 
     if result is None:
-        raise HTTPException(status_code=404, detail=not_found_detail)
+        raise WeatherDataNotFound()
     return result
 
 
@@ -44,12 +47,10 @@ async def _fetch_weather_data(fetcher, not_found_detail: str, *args):
 async def get_current_weather(
     lat: float = Query(..., ge=-90, le=90),
     lon: float = Query(..., ge=-180, le=180),
-    user_payload: dict = Depends(authenticate_rest),
+    _: str = Depends(get_current_user_id),
 ) -> CurrentWeatherResponse:
-    _get_user_id(user_payload)
     return await _fetch_weather_data(
         open_weather.get_current_weather,
-        "Current weather data not found",
         lat,
         lon,
     )
@@ -59,12 +60,10 @@ async def get_current_weather(
 async def get_forecast(
     lat: float = Query(..., ge=-90, le=90),
     lon: float = Query(..., ge=-180, le=180),
-    user_payload: dict = Depends(authenticate_rest),
+    _: str = Depends(get_current_user_id),
 ) -> ForecastResponse:
-    _get_user_id(user_payload)
     return await _fetch_weather_data(
         open_weather.get_5_day_3_hour_forecast,
-        "Forecast data not found",
         lat,
         lon,
     )
@@ -74,12 +73,10 @@ async def get_forecast(
 async def get_air_pollution(
     lat: float = Query(..., ge=-90, le=90),
     lon: float = Query(..., ge=-180, le=180),
-    user_payload: dict = Depends(authenticate_rest),
+    _: str = Depends(get_current_user_id),
 ) -> AirPollutionResponse:
-    _get_user_id(user_payload)
     return await _fetch_weather_data(
         open_weather.get_air_pollution,
-        "Air pollution data not found",
         lat,
         lon,
     )
@@ -87,10 +84,12 @@ async def get_air_pollution(
 
 @router.get("/map-layers", response_model=WeatherMapResponse)
 async def get_weather_map_layers(
-    user_payload: dict = Depends(authenticate_rest),
+    _: str = Depends(get_current_user_id),
 ) -> WeatherMapResponse:
-    _get_user_id(user_payload)
     try:
         return open_weather.get_weather_map_urls()
-    except ValueError as exc:
-        raise HTTPException(status_code=503, detail=str(exc))
+    except WeatherConfigurationError as exc:
+        raise DependencyUnavailable(
+            "Weather service is temporarily unavailable.",
+            code=ErrorCode.DEPENDENCY_UNAVAILABLE,
+        ) from exc

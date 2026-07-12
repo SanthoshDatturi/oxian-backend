@@ -4,10 +4,16 @@ from datetime import datetime, timezone
 from firebase_admin import exceptions as firebase_exceptions
 from firebase_admin import messaging
 
+from app.core.errors import (
+    DeviceRegistrationNotFound,
+    ErrorCode,
+    ExternalServiceFailed,
+    ValidationFailed,
+)
 from app.infrastructure.notifications import (
     NotificationProviderError,
-    send_to_topic,
     send_to_tokens,
+    send_to_topic,
 )
 from app.repositories import notification_repository
 from app.schemas.notification import (
@@ -53,7 +59,7 @@ async def refresh_device_registration(
         device_id
     )
     if existing_registration is None or existing_registration.user_id != user_id:
-        raise LookupError("Device registration not found")
+        raise DeviceRegistrationNotFound(device_id)
 
     registration = DeviceRegistration(
         id=device_id,
@@ -97,7 +103,10 @@ async def _create_notification_record(
     delivered_at: datetime | None = None,
 ) -> NotificationRecord:
     if request.content is None:
-        raise ValueError("Notification content is required.")
+        raise ValidationFailed(
+            "Notification content is required.",
+            code=ErrorCode.NOTIFICATION_CONTENT_REQUIRED,
+        )
 
     record = NotificationRecord(
         user_id=user_id,
@@ -111,14 +120,27 @@ async def _create_notification_record(
 
 async def send_notification(request: NotificationRequest) -> NotificationRecord | None:
     if request.content is None:
-        raise ValueError("Notification content is required.")
+        raise ValidationFailed(
+            "Notification content is required.",
+            code=ErrorCode.NOTIFICATION_CONTENT_REQUIRED,
+        )
 
     if request.target.type == NotificationTargetType.TOPIC:
-        await send_to_topic(request)
+        try:
+            await send_to_topic(request)
+        except NotificationProviderError as exc:
+            logger.exception("Topic push notification delivery failed.")
+            raise ExternalServiceFailed(
+                "Failed to send topic push notification.",
+                code=ErrorCode.EXTERNAL_SERVICE_FAILED,
+            ) from exc
         return None
 
     if request.target.user_id is None:
-        raise ValueError("A user target requires user_id.")
+        raise ValidationFailed(
+            "A user target requires user_id.",
+            code=ErrorCode.NOTIFICATION_TARGET_INVALID,
+        )
 
     user_id = request.target.user_id
     registrations = await notification_repository.list_device_registrations(user_id)

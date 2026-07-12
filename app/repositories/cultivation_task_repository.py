@@ -50,9 +50,9 @@ async def save_language(
     translatable_fields = CultivationTaskTranslatableFields.model_validate(
         task
     ).model_dump(exclude_none=True, mode="json")
-    invariant_fields = CultivationTaskInvariantFields.model_validate(
-        task
-    ).model_dump(exclude_none=True, mode="json")
+    invariant_fields = CultivationTaskInvariantFields.model_validate(task).model_dump(
+        exclude_none=True, mode="json"
+    )
     await get_cultivation_tasks_collection().update_one(
         {"_id": task.id, "crop_id": task.crop_id},
         {
