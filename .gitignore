@@ -30,3 +30,7 @@ temp/
 # Local test files
 dev/
 guides/
+
+# Agents
+.agents/
+.codex/

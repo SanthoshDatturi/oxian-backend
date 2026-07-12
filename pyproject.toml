@@ -1,7 +1,7 @@
 [project]
-name = "backend"
+name = "oxian-backend"
 version = "0.1.0"
-description = "Add your description here"
+description = "Oxian is a AI based smart farming assistant that gives data-driven insights"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
@@ -17,5 +17,17 @@ dependencies = [
 
 [dependency-groups]
 dev = [
+    "ruff>=0.15.20",
     "ty>=0.0.21",
 ]
+
+[tool.ruff]
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]
+ignore = ["E501"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
