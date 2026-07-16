@@ -7,7 +7,7 @@ from pydantic import AliasChoices, BaseModel, Field
 
 from .cultivation_crop import BaseCrop
 from .farm_profile import CropYield
-from .generic_types import Area, Level, MoneyValue, TranslatedFields
+from .generic_types import Area, AreaUnit, Level, MoneyValue, TranslatedFields
 from .intercropping_details import IntercropType, SpecificArrangement
 
 
@@ -115,20 +115,12 @@ class RecommendationCountPreference(BaseModel):
     )
 
 
-class BudgetPreference(BaseModel):
-    """Represents cultivation budget constraints provided by the farmer."""
+class BudgetPerArea(BaseModel):
+    """Represents maximum budget constraint per specific area unit."""
 
-    maximum_budget: Optional[MoneyValue] = Field(
-        default=None,
-        description=(
-            "Maximum investment budget the farmer is willing to spend for cultivation."
-        ),
-    )
+    budget: MoneyValue = Field(description="The budget amount and currency.")
 
-    budget_per_area: Optional[MoneyValue] = Field(
-        default=None,
-        description=("Maximum investment budget allowed per cultivation area unit."),
-    )
+    area_unit: AreaUnit = Field(description="The area unit for this budget.")
 
 
 class ResourceConstraint(BaseModel):
@@ -216,14 +208,11 @@ class CropRecommendationRequest(BaseModel):
 
     farming_method_preference: FarmingMethodPreference = Field(
         default=FarmingMethodPreference.ANY,
-        description=("Preferred farming practice or cultivation method."),
+        description="Farming practice preference (e.g. organic).",
     )
 
-    budget_preference: Optional[BudgetPreference] = Field(
-        default=None,
-        description=(
-            "Cultivation investment budget constraints provided by the farmer."
-        ),
+    budget_per_area: Optional[BudgetPerArea] = Field(
+        default=None, description="Cultivation budget constraints per area unit."
     )
 
     excluded_crops: Optional[List[str]] = Field(
